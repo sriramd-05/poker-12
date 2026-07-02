@@ -1259,3 +1259,59 @@ h3 { margin-bottom: 12px; font-size: 1rem; }
   .seat-cards .card .rank { font-size: 0.5rem; }
   .seat-cards .card .suit { font-size: 0.42rem; }
 }
+
+
+@media (max-width: 720px) {
+  .board-zone {
+    top: 40%;
+    width: min(100%, 332px);
+  }
+
+  #boardCards,
+  .board-cards {
+    width: min(100%, 312px);
+    gap: 8px !important;
+  }
+
+  .board-zone .card,
+  #boardCards .card {
+    width: clamp(36px, 9vw, 50px);
+  }
+
+  .seat[data-seat="3"] {
+    left: 17% !important;
+    top: 73% !important;
+  }
+
+  .seat[data-seat="4"] {
+    left: 10% !important;
+    top: 56% !important;
+  }
+
+  .seat[data-seat="2"] {
+    left: 28% !important;
+    top: 84% !important;
+  }
+
+  .seat[data-seat="1"] {
+    left: 50% !important;
+    top: 88% !important;
+  }
+
+  .seat[data-seat="10"] {
+    left: 76% !important;
+    top: 81% !important;
+  }
+
+  .seat-pod {
+    max-width: 86px;
+  }
+
+  .seat-cards {
+    bottom: calc(100% + 2px);
+  }
+
+  .bet-marker {
+    top: calc(100% + 2px);
+  }
+}

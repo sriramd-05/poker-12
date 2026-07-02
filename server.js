@@ -575,6 +575,11 @@ function advancePhase(room) {
   room.currentBet = 0;
   room.lastAggressor = -1;
 
+  if (shouldRunoutBoard(room)) {
+    runoutBoard(room);
+    return;
+  }
+
   if (room.phase === "preflop") {
     room.board.push(room.deck.pop(), room.deck.pop(), room.deck.pop());
     room.phase = "flop";
@@ -599,6 +604,25 @@ function advancePhase(room) {
   }
   room.turnIndex = next;
   beginTurn(room);
+}
+
+
+function shouldRunoutBoard(room) {
+  const contenders = room.players.filter((player) => player.hand.length && !player.folded);
+  const actionable = room.players.filter((player) => player.hand.length && !player.folded && !player.allIn && player.stack > 0 && !player.sittingOut);
+  return contenders.length > 1 && contenders.some((player) => player.allIn) && actionable.length <= 1;
+}
+
+function runoutBoard(room) {
+  clearTurnTimer(room);
+  while (room.board.length < 5) {
+    room.board.push(room.deck.pop());
+    if (room.board.length === 3) room.phase = "flop";
+    else if (room.board.length === 4) room.phase = "turn";
+    else if (room.board.length === 5) room.phase = "river";
+  }
+  room.log.unshift("Board completed after all-in.");
+  showdown(room);
 }
 
 function resetActed(room) {

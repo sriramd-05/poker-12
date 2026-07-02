@@ -355,7 +355,8 @@ function renderSeats() {
     seat.style.cssText = `left:${left};top:${top}`;
 
     if (!player) {
-      seat.className = "seat";
+      seat.dataset.seat = String(seatNumber);
+    seat.className = "seat";
       seat.innerHTML = `<div class="seat-empty"><span class="sn">${sn}</span>Open</div>`;
       seatsEl.appendChild(seat);
       continue;
