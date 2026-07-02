@@ -417,7 +417,7 @@ function renderSeats() {
     const hrBadge = hr ? `<span class="hand-rank-badge rank-${hr.tier}">${escHtml(hr.label)}</span>` : "";
 
     seat.innerHTML = `
-      <div class="seat-pod">
+      <div class="seat-pod simple-seat">
         <div class="avatar-wrap">
           <div class="avatar-ring" style="--pct:0"></div>
           <div class="avatar" style="background:${color}">${escHtml(initials(player.name))}</div>
@@ -903,3 +903,10 @@ window.addEventListener("load", () => {
 
 
 document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") { document.querySelectorAll("audio").forEach((a) => { const p = a.play && a.play(); if (p && p.catch) p.catch(() => {}); }); } });
+
+
+function togglePause() {
+  if (!state) return;
+  send("pauseGame", { paused: !state.paused });
+  optionsMenu?.classList.add("hidden");
+}
