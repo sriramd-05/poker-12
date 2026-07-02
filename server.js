@@ -197,7 +197,6 @@ function joinExistingRoom(client, room, payload, owner = false) {
     seatNumber,
     stack: buyIn,
     bet: 0,
-    totalBet: 0,
     hand: [],
     folded: false,
     allIn: false,
@@ -389,7 +388,6 @@ function pauseGame(client, payload) {
   room.log.unshift(`${player.name} ${room.paused ? "paused" : "resumed"} the game.`);
   if (room.paused) {
     clearTurnTimer(room);
-    if (room.autoStartTimer) { clearTimeout(room.autoStartTimer); room.autoStartTimer = null; }
     broadcastState(room);
     return;
   }
@@ -496,10 +494,7 @@ function makeRoom() {
     phase: "waiting",
     log: ["Create a private table, invite friends, and start a hand."],
     timer: null,
-    autoStartTimer: null,
-    autoStartDeadline: null,
-    turnDeadline: null,
-    lastWin: null
+    turnDeadline: null
   };
 }
 
@@ -511,13 +506,10 @@ function startHand(room) {
   room.currentBet = 0;
   room.phase = "preflop";
   room.log = [];
-  room.lastWin = null;
-  room.autoStartDeadline = null;
 
   room.players.forEach((player) => {
     player.hand = player.seatNumber && player.stack > 0 && !player.sittingOut ? [room.deck.pop(), room.deck.pop()] : [];
     player.bet = 0;
-    player.totalBet = 0;
     player.folded = player.stack <= 0;
     player.allIn = false;
     player.acted = false;
@@ -575,11 +567,6 @@ function advancePhase(room) {
   room.currentBet = 0;
   room.lastAggressor = -1;
 
-  if (shouldRunoutBoard(room)) {
-    runoutBoard(room);
-    return;
-  }
-
   if (room.phase === "preflop") {
     room.board.push(room.deck.pop(), room.deck.pop(), room.deck.pop());
     room.phase = "flop";
@@ -606,115 +593,48 @@ function advancePhase(room) {
   beginTurn(room);
 }
 
-
-function shouldRunoutBoard(room) {
-  const contenders = room.players.filter((player) => player.hand.length && !player.folded);
-  const actionable = room.players.filter((player) => player.hand.length && !player.folded && !player.allIn && player.stack > 0 && !player.sittingOut);
-  return contenders.length > 1 && contenders.some((player) => player.allIn) && actionable.length <= 1;
-}
-
-function runoutBoard(room) {
-  clearTurnTimer(room);
-  while (room.board.length < 5) {
-    room.board.push(room.deck.pop());
-    if (room.board.length === 3) room.phase = "flop";
-    else if (room.board.length === 4) room.phase = "turn";
-    else if (room.board.length === 5) room.phase = "river";
-  }
-  room.log.unshift("Board completed after all-in.");
-  showdown(room);
-}
-
 function resetActed(room) {
   room.players.forEach((player) => {
     if (player.hand.length && !player.folded && !player.allIn) player.acted = false;
   });
 }
 
-// ── Side pot calculation ──────────────────────────────────────────────────────
-function calculateSidePots(room) {
-  // All players who put chips in this hand (including folded)
-  const contributors = room.players.filter((p) => p.totalBet > 0);
-  // Players still in contention at showdown
-  const contenders = room.players.filter((p) => p.hand.length && !p.folded);
-  if (contenders.length === 0 || contributors.length === 0) return [];
-
-  // Build pots level-by-level from smallest all-in upward
-  const levels = [...new Set(contributors.map((p) => p.totalBet))].sort((a, b) => a - b);
-  const pots = [];
-  let prevLevel = 0;
-
-  for (const level of levels) {
-    const slice = level - prevLevel;
-    const inThisLevel = contributors.filter((p) => p.totalBet >= level).length;
-    const amount = slice * inThisLevel;
-    const eligible = contenders.filter((p) => p.totalBet >= level);
-    if (amount > 0 && eligible.length > 0) pots.push({ amount, eligible });
-    prevLevel = level;
-  }
-  return pots;
-}
-
 function showdown(room) {
   clearTurnTimer(room);
-  const pots = calculateSidePots(room);
-
-  if (pots.length === 0) {
-    // Fallback: no contributors tracked, award to last contender
-    const contenders = room.players.filter((p) => p.hand.length && !p.folded);
-    if (contenders.length > 0) awardPot(room, contenders[0], `${contenders[0].name} wins ${room.pot}.`);
-    return;
-  }
-
-  const logLines = [];
-  let mainWinEntry = null;
-
-  for (let i = 0; i < pots.length; i++) {
-    const { amount, eligible } = pots[i];
-    const ranked = eligible
-      .map((p) => ({ player: p, score: bestHand([...p.hand, ...room.board]) }))
-      .sort((a, b) => compareScores(b.score, a.score));
-    const best = ranked[0];
-    const winners = ranked.filter((e) => compareScores(e.score, best.score) === 0);
-    const share = Math.floor(amount / winners.length);
-    winners.forEach((e) => {
-      e.player.stack += share;
-      e.player.showCards = true;
-      e.player.stats.wins += 1;
-      e.player.stats.chipsWon += share;
-      e.player.stats.biggestPot = Math.max(e.player.stats.biggestPot || 0, share);
-    });
-    const label = pots.length > 1 ? (i === pots.length - 1 ? "main pot" : `side pot ${i + 1}`) : "pot";
-    const line = `${winners.map((e) => e.player.name).join(" & ")} win ${share} (${label}) with ${best.score.name}.`;
-    logLines.push(line);
-    if (i === pots.length - 1) {
-      mainWinEntry = { names: winners.map((e) => e.player.name), handName: best.score.name, amount: share };
-    }
-  }
-
-  room.log.unshift(...logLines.reverse());
+  const contenders = room.players.filter((player) => player.hand.length && !player.folded);
+  const ranked = contenders
+    .map((player) => ({ player, score: bestHand([...player.hand, ...room.board]) }))
+    .sort((a, b) => compareScores(b.score, a.score));
+  const best = ranked[0];
+  const winners = ranked.filter((entry) => compareScores(entry.score, best.score) === 0);
+  const share = Math.floor(room.pot / winners.length);
+  winners.forEach((entry) => {
+    entry.player.stack += share;
+    entry.player.showCards = true;
+    entry.player.stats.wins += 1;
+    entry.player.stats.chipsWon += share;
+    entry.player.stats.biggestPot = Math.max(entry.player.stats.biggestPot, share);
+  });
+  room.log.unshift(`${winners.map((entry) => entry.player.name).join(", ")} win ${share} with ${best.score.name}.`);
   room.pot = 0;
   room.phase = "showdown";
   room.turnIndex = -1;
-  room.lastWin = mainWinEntry;
   broadcastState(room);
-  scheduleAutoStart(room);
 }
 
 function awardPot(room, player, message) {
   clearTurnTimer(room);
   const won = room.pot;
-  player.stack += won;
+  player.stack += room.pot;
+  player.showCards = true;
   player.stats.wins += 1;
   player.stats.chipsWon += won;
-  player.stats.biggestPot = Math.max(player.stats.biggestPot || 0, won);
+  player.stats.biggestPot = Math.max(player.stats.biggestPot, won);
   room.pot = 0;
   room.phase = "showdown";
   room.turnIndex = -1;
   room.log.unshift(message);
-  room.lastWin = { names: [player.name], handName: null, amount: won };
   broadcastState(room);
-  scheduleAutoStart(room);
 }
 
 function showCards(client) {
@@ -775,7 +695,6 @@ function takeChips(player, amount) {
   const paid = Math.min(player.stack, Math.max(0, amount));
   player.stack -= paid;
   player.bet += paid;
-  player.totalBet += paid;
   if (player.stack === 0) player.allIn = true;
   return paid;
 }
@@ -808,8 +727,6 @@ function publicState(room, viewerId) {
     log: room.log.slice(0, 8),
     chipRequests: room.chipRequests,
     ledger: room.ledger.slice(0, 100),
-    nextHandDeadline: room.autoStartDeadline || null,
-    lastWin: room.lastWin || null,
     players: room.players.map((player, index) => ({
       id: player.id,
       name: player.name,
@@ -895,20 +812,6 @@ function send(client, type, payload) {
   client.socket.write(Buffer.concat([header, json]));
 }
 
-function scheduleAutoStart(room) {
-  if (room.autoStartTimer) clearTimeout(room.autoStartTimer);
-  const delay = 6000;
-  room.autoStartDeadline = Date.now() + delay;
-  broadcastState(room);
-  room.autoStartTimer = setTimeout(() => {
-    room.autoStartTimer = null;
-    room.autoStartDeadline = null;
-    if (room.paused) return;
-    const seated = room.players.filter((p) => p.seatNumber && p.stack > 0 && !p.sittingOut);
-    if (seated.length >= 2) startHand(room);
-  }, delay);
-}
-
 function disconnect(client) {
   if (!clients.has(client.id)) return;
   clients.delete(client.id);
@@ -925,18 +828,6 @@ function disconnect(client) {
     }
   }
 }
-
-// Heartbeat: ping all clients every 25s to detect stale connections
-setInterval(() => {
-  for (const client of clients.values()) {
-    try {
-      // Send a raw WebSocket ping frame (opcode 0x89)
-      client.socket.write(Buffer.from([0x89, 0x00]));
-    } catch {
-      disconnect(client);
-    }
-  }
-}, 25000);
 
 function getRoom(client) {
   return client.roomCode ? rooms.get(client.roomCode) : null;

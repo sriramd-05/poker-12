@@ -79,38 +79,16 @@
           <button id="rejoinSeatBtn">Take Seat</button>
         </section>
 
-        <section class="next-hand-bar hidden" id="nextHandBar"></section>
-
         <section class="table-wrap">
-          <div class="table-container">
-            <!-- Pause overlay (outside .table to avoid overflow:hidden clipping) -->
-            <div id="pauseOverlay" class="pause-overlay hidden">
-              <div class="pause-inner">
-                <span class="pause-icon">⏸</span>
-                <p>Game Paused</p>
+          <div class="table" id="table">
+            <div class="board-zone">
+              <div class="pot-stack">
+                <div class="pot total-pot" id="potLabel">Total Pot 0</div>
+                <div class="round-pot" id="roundPotLabel">Round 0</div>
               </div>
+              <div class="cards" id="boardCards"></div>
             </div>
-            <!-- Win announcement -->
-            <div id="winOverlay" class="win-overlay hidden">
-              <div class="win-inner">
-                <div class="win-trophy">🏆</div>
-                <div class="win-names"></div>
-                <div class="win-hand"></div>
-                <div class="win-amount"></div>
-              </div>
-            </div>
-            <div class="table" id="table">
-  <div id="pauseOverlay" class="pause-overlay hidden">Paused</div>
-              <div class="table-brand"><span>Friends Poker</span></div>
-              <div class="board-zone">
-                <div class="pot-stack">
-                  <div class="pot total-pot" id="potLabel">Pot  0</div>
-                  <div class="round-pot hidden" id="roundPotLabel">Bet  0</div>
-                </div>
-                <div class="cards" id="boardCards"></div>
-              </div>
-              <div class="seats" id="seats"></div>
-            </div>
+            <div class="seats" id="seats"></div>
           </div>
         </section>
 
@@ -123,16 +101,9 @@
             <button data-action="fold" class="secondary">Fold</button>
             <button data-action="check" class="secondary">Check</button>
             <button data-action="call">Call</button>
-            <button data-action="allIn" class="danger">All-in</button>
-          </div>
-          <div class="raise-row">
-            <div class="quick-bets">
-              <button data-bet="0.5" class="secondary quick-bet">½ Pot</button>
-              <button data-bet="1"   class="secondary quick-bet">Pot</button>
-              <button data-bet="2"   class="secondary quick-bet">2×</button>
-            </div>
             <input id="raiseInput" type="number" min="20" step="10" value="40">
             <button data-action="raise">Raise</button>
+            <button data-action="allIn" class="danger">All-in</button>
           </div>
         </section>
 
@@ -174,6 +145,5 @@
       </section>
     </main>
     <script src="/app.js"></script>
-  <audio id="audioUnlock" playsinline preload="auto"></audio>
-</body>
+  </body>
 </html>
