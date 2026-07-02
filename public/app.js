@@ -72,16 +72,16 @@ const RECONNECT_DELAYS = [1000, 2000, 3000, 5000, 8000, 15000, 30000, 30000];
 
 // Positions tuned for tall rounded-rectangle table — seat 1 at bottom-centre, clockwise
 const seatPositions = [
-  ["50%", "90%"],  // 1 bottom centre
-  ["24%", "82%"],  // 2 bottom left
-  ["7%",  "64%"],  // 3 left lower
-  ["7%",  "36%"],  // 4 left upper
-  ["24%", "18%"],  // 5 top left
-  ["50%", "10%"],  // 6 top centre
-  ["76%", "18%"],  // 7 top right
-  ["93%", "36%"],  // 8 right upper
-  ["93%", "64%"],  // 9 right lower
-  ["76%", "82%"],  // 10 bottom right
+  ["50%", "88%"],  // 1 bottom centre
+  ["26%", "80%"],  // 2 bottom left
+  ["9%",  "62%"],  // 3 left lower
+  ["9%",  "38%"],  // 4 left upper
+  ["26%", "20%"],  // 5 top left
+  ["50%", "12%"],  // 6 top centre
+  ["74%", "20%"],  // 7 top right
+  ["91%", "38%"],  // 8 right upper
+  ["91%", "62%"],  // 9 right lower
+  ["74%", "80%"],  // 10 bottom right
 ];
 
 // ── Hand rank evaluation ──────────────────────────────────────────────────────
