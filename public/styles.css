@@ -1315,3 +1315,33 @@ h3 { margin-bottom: 12px; font-size: 1rem; }
     top: calc(100% + 2px);
   }
 }
+
+.pause-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 14;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: rgba(6, 10, 14, 0.48);
+  backdrop-filter: blur(3px);
+  color: var(--gold, #f1cd66);
+  border-radius: inherit;
+  pointer-events: none;
+}
+.pause-overlay span { font-size: 2.4rem; line-height: 1; }
+.pause-overlay p { margin: 0; font-size: 1rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+
+@media (max-width: 720px) {
+  .board-zone { top: 40%; width: min(100%, 360px); }
+  #boardCards, .board-cards { width: min(100%, 344px); gap: 10px !important; }
+  .board-zone .card, #boardCards .card {
+    width: clamp(46px, 12vw, 62px);
+    border-radius: 10px;
+  }
+  .board-zone .card .rank, #boardCards .card .rank { font-size: clamp(1.1rem, 3vw, 1.45rem); }
+  .board-zone .card .suit, #boardCards .card .suit { font-size: clamp(1rem, 2.6vw, 1.2rem); }
+  .seat-cards .card { width: 22px; height: 31px; }
+}

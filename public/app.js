@@ -1,4 +1,34 @@
 
+let audioUnlocked = false;
+function unlockAudio() {
+  try {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (AC) {
+      const ctx = new AC();
+      if (ctx.state === 'suspended') ctx.resume();
+      const buffer = ctx.createBuffer(1, 1, 22050);
+      const source = ctx.createBufferSource();
+      source.buffer = buffer;
+      source.connect(ctx.destination);
+      source.start(0);
+      setTimeout(() => { try { ctx.close(); } catch (e) {} }, 50);
+    }
+    const unlockEl = document.getElementById('audioUnlock');
+    if (unlockEl) {
+      unlockEl.muted = false;
+      unlockEl.volume = 0;
+      const p = unlockEl.play();
+      if (p && p.catch) p.catch(() => {});
+      unlockEl.pause();
+    }
+    audioUnlocked = true;
+  } catch (e) {}
+}
+
+document.addEventListener('touchstart', () => { if (!audioUnlocked) unlockAudio(); }, { once: true, passive: true });
+document.addEventListener('click', () => { if (!audioUnlocked) unlockAudio(); }, { once: true });
+
+
 async function ensureAudioPlayback(el) {
   if (!el) return;
   el.setAttribute('autoplay', '');
@@ -158,7 +188,7 @@ createBtn.addEventListener("click", () => connect("createRoom"));
 joinBtn.addEventListener("click", () => connect("joinRoom"));
 copyCodeBtn.addEventListener("click", copyRoomCode);
 startHandBtn.addEventListener("click", () => send("startHand"));
-voiceBtn.addEventListener("click", async () => { await startVoice(); document.querySelectorAll("audio").forEach((a) => ensureAudioPlayback(a)); });
+voiceBtn.addEventListener("click", async () => { unlockAudio(); await startVoice(); document.querySelectorAll("audio").forEach((a) => ensureAudioPlayback(a)); });
 muteBtn.addEventListener("click", toggleMute);
 soundBtn.addEventListener("click", toggleSound);
 awayBtn.addEventListener("click", toggleAway);
@@ -737,7 +767,7 @@ function ensurePeer(targetId, polite) {
 
   pc.addEventListener("track", (e) => {
     let audio = document.querySelector(`[data-audio="${targetId}"]`);
-    if (!audio) { audio = document.createElement("audio"); audio.autoplay = true; audio.playsInline = true; audio.setAttribute('playsinline', ''); audio.dataset.audio = targetId; audioMount.appendChild(audio); }
+    if (!audio) { audio = document.createElement("audio"); audio.autoplay = true; audio.playsInline = true; audio.setAttribute('playsinline', ''); audio.muted = false; audio.volume = 1; audio.dataset.audio = targetId; audioMount.appendChild(audio); }
     audio.srcObject = e.streams[0];
     startLevelMeter(e.streams[0], targetId);
   });
@@ -870,3 +900,6 @@ window.addEventListener("load", () => {
   notice.textContent = "Reconnecting to your table…";
   connect("joinRoom");
 });
+
+
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") { document.querySelectorAll("audio").forEach((a) => { const p = a.play && a.play(); if (p && p.catch) p.catch(() => {}); }); } });
