@@ -27,6 +27,8 @@ const timerLabel = document.querySelector("#timerLabel");
 const raiseInput = document.querySelector("#raiseInput");
 const messages = document.querySelector("#messages");
 const chatForm = document.querySelector("#chatForm");
+const controls = document.querySelector("#controls");
+const chipRequestToast = document.querySelector("#chipRequestToast");
 const chatInput = document.querySelector("#chatInput");
 const handLog = document.querySelector("#handLog");
 const voicePeers = document.querySelector("#voicePeers");
@@ -189,6 +191,7 @@ function render(nextState) {
   renderChipRequests();
   renderStats();
   renderLedger();
+  updateControlTurnState();
   renderRejoinBar();
   reactToStateChange(previous, state);
 }
@@ -300,24 +303,17 @@ function renderLog() {
 }
 
 function renderChipRequests() {
-  const me = state.players.find((player) => player.id === playerId);
-  const isOwner = state.ownerId === playerId;
-  chipsForm.classList.toggle("hidden", !me || (me.stack > 0 && state.phase !== "showdown"));
-  chipRequests.innerHTML = "";
-  if (!state.chipRequests?.length) {
-    chipRequests.innerHTML = '<p class="muted-line">No chip requests.</p>';
+  if (!chipRequestToast) return;
+  const me = state?.players?.find((p) => p.id === playerId);
+  const isOwner = Boolean(me?.isOwner);
+  if (!isOwner || !state?.chipRequests?.length) {
+    chipRequestToast.classList.add('hidden');
+    chipRequestToast.innerHTML = '';
     return;
   }
-
-  state.chipRequests.forEach((request) => {
-    const row = document.createElement("div");
-    row.className = "chip-request";
-    row.innerHTML = `
-      <span>${escapeHtml(request.name)} wants ${request.amount}</span>
-      ${isOwner ? `<button data-request-id="${request.id}" data-amount="${request.amount}">Add</button>` : '<span class="muted-line">Waiting</span>'}
-    `;
-    chipRequests.appendChild(row);
-  });
+  const latest = state.chipRequests[state.chipRequests.length - 1];
+  chipRequestToast.classList.remove('hidden');
+  chipRequestToast.innerHTML = `<strong>${escapeHtml(latest.name)}</strong> requested <strong>${latest.amount}</strong> chips`;
 }
 
 function renderStats() {
@@ -556,4 +552,13 @@ function escapeHtml(text) {
     '"': "&quot;",
     "'": "&#039;"
   }[char]));
+}
+
+
+function updateControlTurnState() {
+  if (!controls || !state || !playerId) return;
+  const me = state.players?.find((p) => p.id === playerId);
+  const myTurn = Boolean(me && state.players?.[state.turnIndex]?.id === me.id && !state.paused);
+  controls.classList.toggle('turn-active', myTurn);
+  controls.classList.toggle('turn-wait', !myTurn);
 }
