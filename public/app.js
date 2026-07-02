@@ -15,6 +15,8 @@ const soundBtn = document.querySelector("#soundBtn");
 const awayBtn = document.querySelector("#awayBtn");
 const pauseBtn = document.querySelector("#pauseBtn");
 const showCardsBtn = document.querySelector("#showCardsBtn");
+const muckCardsBtn = document.querySelector("#muckCardsBtn");
+const winnerBanner = document.querySelector("#winnerBanner");
 const startHandBtn = document.querySelector("#startHandBtn");
 const menuBtn = document.querySelector("#menuBtn");
 const optionsMenu = document.querySelector("#optionsMenu");
@@ -78,6 +80,7 @@ soundBtn.addEventListener("click", toggleSound);
 awayBtn.addEventListener("click", toggleAway);
 pauseBtn.addEventListener("click", togglePause);
 showCardsBtn.addEventListener("click", () => send("showCards"));
+muckCardsBtn.addEventListener("click", () => send("muckCards"));
 leaveSeatBtn.addEventListener("click", () => {
   send("leaveSeat");
   optionsMenu.classList.add("hidden");
@@ -190,7 +193,31 @@ function render(nextState) {
   renderStats();
   renderLedger();
   renderRejoinBar();
+  renderWinnerBanner(previous);
   reactToStateChange(previous, state);
+}
+
+let winnerBannerTimeout = null;
+
+function renderWinnerBanner(previous) {
+  if (!winnerBanner) return;
+  const isNewWin = state.lastWin && (!previous?.lastWin || previous.lastWin.at !== state.lastWin.at);
+  if (isNewWin) {
+    const win = state.lastWin;
+    const names = win.winners.map((entry) => entry.name).join(", ");
+    const handText = win.handName ? ` with ${titleCase(win.handName)}` : "";
+    winnerBanner.textContent = win.winners.length > 1
+      ? `${names} split the pot (${win.amount} each)${handText}`
+      : `${names} wins ${win.amount}${handText}`;
+    winnerBanner.classList.remove("hidden");
+    clearTimeout(winnerBannerTimeout);
+    winnerBannerTimeout = setTimeout(() => {
+      winnerBanner.classList.add("hidden");
+    }, 6000);
+  }
+  if (state.phase !== "showdown" && !state.lastWin) {
+    winnerBanner.classList.add("hidden");
+  }
 }
 
 function renderSeats() {
@@ -199,7 +226,7 @@ function renderSeats() {
     const player = state.players.find((item) => item.seatNumber === seatNumber);
     const seat = document.createElement("article");
     seat.className = player
-      ? `seat ${player.isTurn ? "turn" : ""} ${player.id === playerId ? "me" : ""} ${player.sittingOut ? "away" : ""}`
+      ? `seat ${player.isTurn ? "turn" : ""} ${player.id === playerId ? "me" : ""} ${player.sittingOut ? "away" : ""} ${player.wonHand ? "winner" : ""}`
       : "seat seat-empty";
     const position = seatPosition(seatNumber);
     seat.style.left = position[0];
@@ -215,6 +242,7 @@ function renderSeats() {
     const status = player.sittingOut ? "Away" : player.stack === 0 ? "Broke" : player.folded ? "Folded" : player.allIn ? "All-in" : !player.connected ? "Offline" : "";
     const statusBadge = status ? `<span class="badge ${status === "Folded" || status === "Broke" ? "warn" : ""}">${status}</span>` : "";
     const betBadge = player.bet ? `<span class="badge bet">${player.bet}</span>` : "";
+    const winBadge = player.wonHand ? `<span class="badge win">Winner</span>` : "";
     seat.innerHTML = `
       <div class="cards seat-cards"></div>
       <div class="seat-pod">
@@ -222,7 +250,7 @@ function renderSeats() {
         <div class="seat-info">
           <span class="seat-name">${escapeHtml(player.name)}${player.isOwner ? " *" : ""}</span>
           <span class="seat-stack">${player.stack}</span>
-          ${statusBadge || betBadge}
+          ${winBadge || statusBadge || betBadge}
         </div>
       </div>
     `;
@@ -262,15 +290,16 @@ function renderControls() {
   const current = state.players[state.turnIndex];
   const myTurn = current?.id === playerId;
   const pausedText = state.paused ? "Paused by owner" : "";
-  turnLabel.textContent = pausedText || (current ? `${current.name}'s turn` : state.phase === "waiting" ? "Waiting for players" : "Hand complete");
+  const autoStartText = state.phase === "showdown" && state.autoStartDeadline ? "Next hand starting..." : "Hand complete";
+  turnLabel.textContent = pausedText || (current ? `${current.name}'s turn` : state.phase === "waiting" ? "Waiting for players" : autoStartText);
   startHandBtn.disabled = state.paused;
   pauseBtn.classList.toggle("hidden", state.ownerId !== playerId);
   pauseBtn.textContent = state.paused ? "Resume" : "Pause";
   awayBtn.textContent = me?.sittingOut ? "Back" : "Away";
   awayBtn.disabled = !me || !me.seatNumber;
-  const canShowCards = state.phase === "showdown" && me?.cards?.some(Boolean);
-  const alreadyShowing = me?.showingCards;
-  showCardsBtn.classList.toggle("hidden", !canShowCards || alreadyShowing);
+  const canDecideCards = state.phase === "showdown" && me?.cards?.some(Boolean) && !me?.cardsDecided;
+  showCardsBtn.classList.toggle("hidden", !canDecideCards);
+  muckCardsBtn.classList.toggle("hidden", !canDecideCards);
   document.querySelectorAll("[data-action]").forEach((button) => {
     button.disabled = state.paused || me?.sittingOut || !myTurn || state.phase === "waiting" || state.phase === "showdown";
   });
@@ -284,11 +313,12 @@ function renderControls() {
 
   clearInterval(timerInterval);
   timerInterval = setInterval(() => {
-    if (!state.turnDeadline) {
+    const deadline = state.turnDeadline || state.autoStartDeadline;
+    if (!deadline) {
       timerLabel.textContent = "--";
       return;
     }
-    const left = Math.max(0, Math.ceil((state.turnDeadline - Date.now()) / 1000));
+    const left = Math.max(0, Math.ceil((deadline - Date.now()) / 1000));
     timerLabel.textContent = `${left}s`;
   }, 250);
 }

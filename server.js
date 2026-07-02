@@ -154,6 +154,7 @@ function handleMessage(client, message) {
   if (type === "setAway") setAway(client, payload);
   if (type === "pauseGame") pauseGame(client, payload);
   if (type === "showCards") showCards(client);
+  if (type === "muckCards") muckCards(client);
   if (type === "leaveSeat") leaveSeat(client);
   if (type === "rejoinSeat") rejoinSeat(client, payload);
 }
@@ -240,6 +241,8 @@ function startHandForClient(client) {
     broadcast(room, "system", { message: "Need at least two players with chips to start." });
     return;
   }
+  if (room.autoStartTimer) { clearTimeout(room.autoStartTimer); room.autoStartTimer = null; }
+  room.autoStartDeadline = null;
   startHand(room);
 }
 
@@ -388,11 +391,18 @@ function pauseGame(client, payload) {
   room.log.unshift(`${player.name} ${room.paused ? "paused" : "resumed"} the game.`);
   if (room.paused) {
     clearTurnTimer(room);
+    if (room.autoStartTimer) { clearTimeout(room.autoStartTimer); room.autoStartTimer = null; }
+    room.autoStartDeadline = null;
     broadcastState(room);
     return;
   }
   if (room.phase !== "waiting" && room.phase !== "showdown" && room.turnIndex !== -1) {
     beginTurn(room);
+    return;
+  }
+  if (room.phase === "showdown") {
+    const seated = room.players.filter((p) => p.seatNumber && p.stack > 0 && !p.sittingOut);
+    if (seated.length >= 2) scheduleAutoStart(room);
     return;
   }
   broadcastState(room);
@@ -494,12 +504,18 @@ function makeRoom() {
     phase: "waiting",
     log: ["Create a private table, invite friends, and start a hand."],
     timer: null,
-    turnDeadline: null
+    turnDeadline: null,
+    lastWin: null,
+    autoStartTimer: null,
+    autoStartDeadline: null
   };
 }
 
 function startHand(room) {
   clearTurnTimer(room);
+  if (room.autoStartTimer) { clearTimeout(room.autoStartTimer); room.autoStartTimer = null; }
+  room.autoStartDeadline = null;
+  room.lastWin = null;
   room.deck = shuffledDeck();
   room.board = [];
   room.pot = 0;
@@ -514,6 +530,8 @@ function startHand(room) {
     player.allIn = false;
     player.acted = false;
     player.showCards = false;
+    player.cardsDecided = false;
+    player.wonHand = false;
     if (player.hand.length) player.stats.hands += 1;
   });
 
@@ -608,43 +626,83 @@ function showdown(room) {
   const best = ranked[0];
   const winners = ranked.filter((entry) => compareScores(entry.score, best.score) === 0);
   const share = Math.floor(room.pot / winners.length);
+
+  room.players.forEach((player) => {
+    player.cardsDecided = false;
+  });
+
   winners.forEach((entry) => {
     entry.player.stack += share;
     entry.player.showCards = true;
+    entry.player.cardsDecided = true;
+    entry.player.wonHand = true;
     entry.player.stats.wins += 1;
     entry.player.stats.chipsWon += share;
     entry.player.stats.biggestPot = Math.max(entry.player.stats.biggestPot, share);
   });
+
+  const winnerIds = new Set(winners.map((entry) => entry.player.id));
+  contenders.forEach((player) => {
+    if (!winnerIds.has(player.id)) player.wonHand = false;
+  });
+
   room.log.unshift(`${winners.map((entry) => entry.player.name).join(", ")} win ${share} with ${best.score.name}.`);
+  room.lastWin = {
+    winners: winners.map((entry) => ({ name: entry.player.name, amount: share })),
+    handName: best.score.name,
+    amount: share,
+    at: Date.now()
+  };
   room.pot = 0;
   room.phase = "showdown";
   room.turnIndex = -1;
   broadcastState(room);
+  scheduleAutoStart(room);
 }
+
 
 function awardPot(room, player, message) {
   clearTurnTimer(room);
   const won = room.pot;
-  player.stack += room.pot;
-  player.showCards = true;
+  player.stack += won;
+  player.cardsDecided = false;
+  player.wonHand = true;
   player.stats.wins += 1;
   player.stats.chipsWon += won;
   player.stats.biggestPot = Math.max(player.stats.biggestPot, won);
+  room.players.forEach((p) => {
+    if (p.id !== player.id) p.wonHand = false;
+  });
   room.pot = 0;
   room.phase = "showdown";
   room.turnIndex = -1;
   room.log.unshift(message);
+  room.lastWin = { winners: [{ name: player.name, amount: won }], handName: null, amount: won, at: Date.now() };
   broadcastState(room);
+  scheduleAutoStart(room);
 }
+
 
 function showCards(client) {
   const room = getRoom(client);
   const player = getPlayer(client);
   if (!room || !player || room.phase !== "showdown" || !player.hand.length) return;
   player.showCards = true;
+  player.cardsDecided = true;
   room.log.unshift(`${player.name} showed their cards.`);
   broadcastState(room);
 }
+
+function muckCards(client) {
+  const room = getRoom(client);
+  const player = getPlayer(client);
+  if (!room || !player || room.phase !== "showdown" || !player.hand.length) return;
+  player.showCards = false;
+  player.cardsDecided = true;
+  room.log.unshift(`${player.name} chose not to show their cards.`);
+  broadcastState(room);
+}
+
 
 function beginTurn(room) {
   if (room.turnIndex === -1) {
@@ -723,6 +781,8 @@ function publicState(room, viewerId) {
     currentBet: room.currentBet,
     turnIndex: room.turnIndex,
     turnDeadline: room.turnDeadline,
+    autoStartDeadline: room.autoStartDeadline,
+    lastWin: room.lastWin,
     dealerIndex: room.dealerIndex,
     log: room.log.slice(0, 8),
     chipRequests: room.chipRequests,
@@ -739,6 +799,8 @@ function publicState(room, viewerId) {
       muted: player.muted,
       sittingOut: player.sittingOut,
       showingCards: player.showCards,
+      cardsDecided: Boolean(player.cardsDecided),
+      wonHand: Boolean(player.wonHand),
       isOwner: player.id === room.ownerId,
       stats: player.stats,
       dealer: index === room.dealerIndex,
@@ -810,6 +872,21 @@ function send(client, type, payload) {
     header.writeUInt32BE(json.length, 6);
   }
   client.socket.write(Buffer.concat([header, json]));
+}
+
+function scheduleAutoStart(room) {
+  if (room.autoStartTimer) clearTimeout(room.autoStartTimer);
+  const delay = 6000;
+  room.autoStartDeadline = Date.now() + delay;
+  room.autoStartTimer = setTimeout(() => {
+    room.autoStartTimer = null;
+    room.autoStartDeadline = null;
+    if (room.paused) return;
+    const seated = room.players.filter((p) => p.seatNumber && p.stack > 0 && !p.sittingOut);
+    if (seated.length >= 2 && (room.phase === "waiting" || room.phase === "showdown")) startHand(room);
+    else broadcastState(room);
+  }, delay);
+  broadcastState(room);
 }
 
 function disconnect(client) {
