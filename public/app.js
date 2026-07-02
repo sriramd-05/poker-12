@@ -567,18 +567,4 @@ function updateControlTurnState() {
   const me = state.players?.find((p) => p.id === playerId);
   const myTurn = Boolean(me && state.players?.[state.turnIndex]?.id === me.id && !state.paused);
   controls.classList.toggle('turn-active', myTurn);
-  controls.classList.toggle('turn-wait', !myTurn);
 }
-
-
-const _origRender = render;
-render = function(nextState) {
-  _origRender(nextState);
-  const me = state?.players?.find((p) => p.id === playerId);
-  const isOwner = Boolean(me?.isOwner);
-  if (chipRequestToast) {
-    const req = state?.chipRequests?.[state.chipRequests.length - 1];
-    chipRequestToast.classList.toggle('hidden', !(isOwner && req));
-    if (isOwner && req) chipRequestToast.textContent = `${req.name} requested ${req.amount} chips`;
-  }
-};
