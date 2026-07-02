@@ -1,3 +1,11 @@
+
+async function ensureAudioPlayback(el) {
+  if (!el) return;
+  el.setAttribute('autoplay', '');
+  el.setAttribute('playsinline', '');
+  try { await el.play(); } catch (e) {}
+}
+
 // ── DOM refs ──────────────────────────────────────────────────────────────────
 const joinPanel      = document.querySelector("#joinPanel");
 const tableScreen    = document.querySelector("#tableScreen");
@@ -150,7 +158,7 @@ createBtn.addEventListener("click", () => connect("createRoom"));
 joinBtn.addEventListener("click", () => connect("joinRoom"));
 copyCodeBtn.addEventListener("click", copyRoomCode);
 startHandBtn.addEventListener("click", () => send("startHand"));
-voiceBtn.addEventListener("click", startVoice);
+voiceBtn.addEventListener("click", async () => { await startVoice(); document.querySelectorAll("audio").forEach((a) => ensureAudioPlayback(a)); });
 muteBtn.addEventListener("click", toggleMute);
 soundBtn.addEventListener("click", toggleSound);
 awayBtn.addEventListener("click", toggleAway);
@@ -728,7 +736,7 @@ function ensurePeer(targetId, polite) {
 
   pc.addEventListener("track", (e) => {
     let audio = document.querySelector(`[data-audio="${targetId}"]`);
-    if (!audio) { audio = document.createElement("audio"); audio.autoplay = true; audio.dataset.audio = targetId; audioMount.appendChild(audio); }
+    if (!audio) { audio = document.createElement("audio"); audio.autoplay = true; audio.playsInline = true; audio.setAttribute('playsinline', ''); audio.dataset.audio = targetId; audioMount.appendChild(audio); }
     audio.srcObject = e.streams[0];
     startLevelMeter(e.streams[0], targetId);
   });
