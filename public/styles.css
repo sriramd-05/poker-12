@@ -633,31 +633,31 @@ form {
 
 
 @media (max-width: 720px) {
-  .seat, .player-card, .player-box {
-    background: transparent !important;
-    border: 0 !important;
-    box-shadow: none !important;
-  }
+  .seat { position: absolute; width: auto; height: auto; }
   .seat-panel, .seat-body {
-    background: rgba(18,22,30,.82) !important;
-    border: 1px solid rgba(255,255,255,.07) !important;
-    border-radius: 12px !important;
-    padding: 8px 10px !important;
-    min-width: 92px !important;
+    display: flex; flex-direction: column; align-items: flex-start;
+    background: rgba(18,22,30,.84) !important; border: 1px solid rgba(255,255,255,.08) !important;
+    border-radius: 12px !important; padding: 8px 10px !important; min-width: 92px !important;
+    box-shadow: 0 8px 18px rgba(0,0,0,.16);
   }
-  .seat-cards { display: none !important; }
-  .seat-name { font-size: .75rem !important; font-weight: 700; }
-  .seat-stack { font-size: .62rem !important; opacity: .9; }
-  .seat-combo { display:inline-flex; padding:2px 8px; border-radius:999px; font-size:.58rem; margin-top:3px; background:rgba(255,255,255,.08); }
-  .seat[data-seat="2"] { left: 28% !important; top: 84% !important; }
-  .seat[data-seat="3"] { left: 13% !important; top: 68% !important; }
-  .seat[data-seat="4"] { left: 9% !important; top: 50% !important; }
-  .seat[data-seat="5"] { left: 19% !important; top: 25% !important; }
-  .seat[data-seat="7"] { left: 81% !important; top: 25% !important; }
-  .seat[data-seat="8"] { left: 91% !important; top: 50% !important; }
-  .seat[data-seat="9"] { left: 87% !important; top: 68% !important; }
+  .seat-avatar, .seat .avatar { width: 34px !important; height: 34px !important; border-radius: 50%; margin-bottom: 4px; }
+  .seat-name { font-size: .76rem !important; font-weight: 800; color: #fff; line-height: 1.05; }
+  .seat-stack { font-size: .62rem !important; color: rgba(255,255,255,.9); margin-top: 2px; }
+  .seat-combo { display:inline-flex; padding:2px 8px; border-radius:999px; font-size:.58rem; margin-top:4px; background:rgba(255,255,255,.08); color:#dce7f5; }
+  .seat-cards { position: absolute; left: 50%; bottom: calc(100% + 4px); transform: translateX(-50%); gap: 2px; display:flex !important; }
+  .seat-cards .card { width: 18px !important; height: 26px !important; }
+  .seat[data-seat="1"] { left: 49% !important; top: 88% !important; }
+  .seat[data-seat="2"] { left: 24% !important; top: 82% !important; }
+  .seat[data-seat="3"] { left: 8% !important; top: 62% !important; }
+  .seat[data-seat="4"] { left: 8% !important; top: 38% !important; }
+  .seat[data-seat="5"] { left: 24% !important; top: 18% !important; }
+  .seat[data-seat="6"] { left: 50% !important; top: 10% !important; }
+  .seat[data-seat="7"] { left: 76% !important; top: 18% !important; }
+  .seat[data-seat="8"] { left: 92% !important; top: 38% !important; }
+  .seat[data-seat="9"] { left: 92% !important; top: 62% !important; }
+  .seat[data-seat="10"] { left: 76% !important; top: 82% !important; }
 }
-.controls.turn-active { border-color: rgba(241,205,102,.85); box-shadow: 0 0 0 2px rgba(241,205,102,.14); }
-.controls.turn-active::before { content:"YOUR TURN"; display:block; color:#f1cd66; font-size:.72rem; font-weight:800; letter-spacing:.08em; margin-bottom:8px; }
-.controls.turn-wait::before { content:"WAITING"; display:block; color:rgba(255,255,255,.45); font-size:.72rem; font-weight:700; letter-spacing:.08em; margin-bottom:8px; }
-.chip-request-toast { position: fixed; right: 12px; top: 72px; z-index: 80; max-width: 320px; padding: 12px 14px; border-radius: 12px; background: rgba(17,20,28,.96); color: #fff; border: 1px solid rgba(236,201,93,.35); box-shadow: 0 12px 30px rgba(0,0,0,.24); }
+
+.controls.turn-active{border-color:rgba(241,205,102,.85);box-shadow:0 0 0 2px rgba(241,205,102,.14)}
+.controls.turn-wait{opacity:.98}
+.controls.turn-active::before{content:"YOUR TURN";display:block;color:#f1cd66;font-size:.72rem;font-weight:800;letter-spacing:.08em;margin-bottom:8px}

@@ -303,17 +303,24 @@ function renderLog() {
 }
 
 function renderChipRequests() {
-  if (!chipRequestToast) return;
-  const me = state?.players?.find((p) => p.id === playerId);
-  const isOwner = Boolean(me?.isOwner);
-  if (!isOwner || !state?.chipRequests?.length) {
-    chipRequestToast.classList.add('hidden');
-    chipRequestToast.innerHTML = '';
+  const me = state.players.find((player) => player.id === playerId);
+  const isOwner = state.ownerId === playerId;
+  chipsForm.classList.toggle("hidden", !me || (me.stack > 0 && state.phase !== "showdown"));
+  chipRequests.innerHTML = "";
+  if (!state.chipRequests?.length) {
+    chipRequests.innerHTML = '<p class="muted-line">No chip requests.</p>';
     return;
   }
-  const latest = state.chipRequests[state.chipRequests.length - 1];
-  chipRequestToast.classList.remove('hidden');
-  chipRequestToast.innerHTML = `<strong>${escapeHtml(latest.name)}</strong> requested <strong>${latest.amount}</strong> chips`;
+
+  state.chipRequests.forEach((request) => {
+    const row = document.createElement("div");
+    row.className = "chip-request";
+    row.innerHTML = `
+      <span>${escapeHtml(request.name)} wants ${request.amount}</span>
+      ${isOwner ? `<button data-request-id="${request.id}" data-amount="${request.amount}">Add</button>` : '<span class="muted-line">Waiting</span>'}
+    `;
+    chipRequests.appendChild(row);
+  });
 }
 
 function renderStats() {
@@ -562,3 +569,16 @@ function updateControlTurnState() {
   controls.classList.toggle('turn-active', myTurn);
   controls.classList.toggle('turn-wait', !myTurn);
 }
+
+
+const _origRender = render;
+render = function(nextState) {
+  _origRender(nextState);
+  const me = state?.players?.find((p) => p.id === playerId);
+  const isOwner = Boolean(me?.isOwner);
+  if (chipRequestToast) {
+    const req = state?.chipRequests?.[state.chipRequests.length - 1];
+    chipRequestToast.classList.toggle('hidden', !(isOwner && req));
+    if (isOwner && req) chipRequestToast.textContent = `${req.name} requested ${req.amount} chips`;
+  }
+};
