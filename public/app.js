@@ -17,6 +17,7 @@ const pauseBtn = document.querySelector("#pauseBtn");
 const showCardsBtn = document.querySelector("#showCardsBtn");
 const muckCardsBtn = document.querySelector("#muckCardsBtn");
 const winnerBanner = document.querySelector("#winnerBanner");
+const handHintBanner = document.querySelector("#handHintBanner");
 const startHandBtn = document.querySelector("#startHandBtn");
 const menuBtn = document.querySelector("#menuBtn");
 const optionsMenu = document.querySelector("#optionsMenu");
@@ -209,6 +210,7 @@ function render(nextState) {
   renderLedger();
   renderRejoinBar();
   renderWinnerBanner(previous);
+  renderHandHint();
   reactToStateChange(previous, state);
 }
 
@@ -229,6 +231,17 @@ function renderWinnerBanner(previous) {
     winnerBannerTimeout = setTimeout(() => winnerBanner.classList.add("hidden"), 5000);
   }
   if (state.phase !== "showdown" && !state.lastWin) winnerBanner.classList.add("hidden");
+}
+
+function renderHandHint() {
+  if (!handHintBanner) return;
+  const me = state.players.find((player) => player.id === playerId);
+  if (me && me.handHint) {
+    handHintBanner.textContent = me.handHint;
+    handHintBanner.classList.remove("hidden");
+  } else {
+    handHintBanner.classList.add("hidden");
+  }
 }
 
 function renderSeats() {
@@ -254,6 +267,7 @@ function renderSeats() {
     const statusBadge = status ? `<span class="badge ${status === "Folded" || status === "Broke" ? "warn" : ""}">${status}</span>` : "";
     const betBadge = player.bet ? `<span class="badge bet">${player.bet}</span>` : "";
     const winBadge = player.wonHand ? '<span class="badge win">Winner</span>' : "";
+    const hintBadge = player.id === playerId && player.handHint ? `<span class="badge hint">${escapeHtml(player.handHint)}</span>` : "";
     seat.innerHTML = `
       <div class="cards seat-cards"></div>
       <div class="seat-pod">
@@ -261,7 +275,7 @@ function renderSeats() {
         <div class="seat-info">
           <span class="seat-name">${escapeHtml(player.name)}${player.isOwner ? " *" : ""}</span>
           <span class="seat-stack">${player.stack}</span>
-          ${winBadge || statusBadge || betBadge}
+          ${winBadge || hintBadge || statusBadge || betBadge}
         </div>
       </div>
     `;

@@ -795,7 +795,10 @@ function publicState(room, viewerId) {
       stats: player.stats,
       dealer: index === room.dealerIndex,
       isTurn: index === room.turnIndex,
-      cards: visibleCardsFor(player, viewerId, room.phase)
+      cards: visibleCardsFor(player, viewerId, room.phase),
+      handHint: player.id === viewerId && !player.folded && player.hand.length && room.phase !== "waiting"
+        ? handHintFor(player, room.board)
+        : null
     }))
   };
 }
@@ -804,6 +807,38 @@ function visibleCardsFor(player, viewerId, phase) {
   if (player.id === viewerId) return player.hand;
   if (phase === "showdown" && player.showCards) return player.hand;
   return player.hand.map(() => null);
+}
+
+const HAND_HINT_LABELS = {
+  "high card": "High Card",
+  "one pair": "Pair",
+  "two pair": "Two Pair",
+  "three of a kind": "Three of a Kind",
+  "straight": "Straight",
+  "flush": "Flush",
+  "full house": "Full House",
+  "four of a kind": "Four of a Kind",
+  "straight flush": "Straight Flush"
+};
+
+function handHintFor(player, board) {
+  if (!player.hand || player.hand.length < 2) return null;
+  const cards = [...player.hand, ...board];
+  let key;
+  if (cards.length >= 5) {
+    key = bestHand(cards).name;
+  } else {
+    const values = cards.map((card) => rankValue(card.rank)).sort((a, b) => b - a);
+    const counts = groupCounts(values);
+    const groups = Object.entries(counts)
+      .map(([value, count]) => ({ value: Number(value), count }))
+      .sort((a, b) => b.count - a.count || b.value - a.value);
+    if (cards.length === 4 && groups[0].count === 3) key = "three of a kind";
+    else if (cards.length === 4 && groups[0].count === 2 && groups[1]?.count === 2) key = "two pair";
+    else if (groups[0].count === 2) key = "one pair";
+    else key = "high card";
+  }
+  return HAND_HINT_LABELS[key] || null;
 }
 
 function makeStats(buyIn) {

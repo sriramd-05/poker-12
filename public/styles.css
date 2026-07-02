@@ -305,6 +305,20 @@ form {
   box-shadow: 0 10px 22px rgba(0, 0, 0, 0.35);
 }
 
+.hand-hint {
+  display: inline-flex;
+  align-self: center;
+  margin: 6px 0 2px;
+  padding: 5px 14px;
+  border-radius: 999px;
+  background: rgba(224, 182, 75, 0.16);
+  border: 1px solid rgba(224, 182, 75, 0.4);
+  color: var(--gold);
+  font-weight: 800;
+  font-size: 0.8rem;
+  letter-spacing: 0.02em;
+}
+
 .pot-stack {
   display: grid;
   justify-items: center;
@@ -526,6 +540,11 @@ form {
   color: #1a1204;
 }
 
+.seat-info .badge.hint {
+  background: rgba(224, 182, 75, 0.22);
+  color: var(--gold);
+}
+
 .seat-cards {
   display: flex;
   gap: 3px;
@@ -730,6 +749,11 @@ form {
     max-width: 84%;
     font-size: 0.7rem;
     padding: 7px 12px;
+  }
+
+  .hand-hint {
+    font-size: 0.72rem;
+    padding: 4px 12px;
   }
 
   .seat-pod {
