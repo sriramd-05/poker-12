@@ -18,6 +18,7 @@ const showCardsBtn = document.querySelector("#showCardsBtn");
 const muckCardsBtn = document.querySelector("#muckCardsBtn");
 const winnerBanner = document.querySelector("#winnerBanner");
 const handHintBanner = document.querySelector("#handHintBanner");
+const requestChipsBtn = document.querySelector("#requestChipsBtn");
 const startHandBtn = document.querySelector("#startHandBtn");
 const menuBtn = document.querySelector("#menuBtn");
 const optionsMenu = document.querySelector("#optionsMenu");
@@ -118,6 +119,17 @@ chipsForm.addEventListener("submit", (event) => {
   send("requestChips", { amount: Number(chipsInput.value) });
   playSound("chips");
 });
+
+if (requestChipsBtn) {
+  requestChipsBtn.addEventListener("click", () => {
+    const amount = Number(chipsInput?.value) || 1000;
+    send("requestChips", { amount });
+    playSound("chips");
+    optionsMenu.classList.add("hidden");
+    notice.textContent = "";
+    addMessage("Table", `You requested ${amount} chips from the owner.`);
+  });
+}
 
 chipRequests.addEventListener("click", (event) => {
   const button = event.target.closest("[data-request-id]");

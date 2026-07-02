@@ -158,7 +158,7 @@ form {
   min-height: 100vh;
   display: grid;
   grid-template-columns: minmax(0, 1fr) 340px;
-  grid-template-rows: auto minmax(500px, 1fr) auto;
+  grid-template-rows: auto minmax(620px, 1fr) auto;
   gap: 16px;
   padding: 16px;
 }
@@ -266,20 +266,21 @@ form {
 
 .table-wrap {
   position: relative;
-  padding: 100px 60px;
+  padding: 108px 50px;
+  width: 100%;
 }
 
 .table {
   position: relative;
-  width: min(100%, 820px);
-  aspect-ratio: 1.35;
+  width: min(100%, 960px);
+  aspect-ratio: 1.5;
   margin: 0 auto;
-  border: 12px solid #3a2415;
-  border-radius: 32px;
+  border: 13px solid #3a2415;
+  border-radius: 34px;
   background:
     radial-gradient(circle at 50% 30%, rgba(255,255,255,0.08), transparent 45%),
     radial-gradient(ellipse at center, var(--felt) 0%, var(--felt-dark) 82%);
-  box-shadow: inset 0 0 0 5px rgba(224, 182, 75, 0.16), inset 0 0 60px rgba(0, 0, 0, 0.5), 0 20px 60px rgba(0, 0, 0, 0.3);
+  box-shadow: inset 0 0 0 5px rgba(224, 182, 75, 0.16), inset 0 0 70px rgba(0, 0, 0, 0.5), 0 24px 70px rgba(0, 0, 0, 0.32);
 }
 
 .board-zone {
@@ -288,94 +289,95 @@ form {
   display: grid;
   align-content: center;
   justify-items: center;
-  gap: 14px;
+  gap: 16px;
   z-index: 2;
-  padding: 0 12px;
+  padding: 0 14px;
 }
 
 .winner-banner {
-  max-width: min(90%, 480px);
-  padding: 9px 18px;
-  border-radius: 12px;
+  max-width: min(90%, 520px);
+  padding: 11px 20px;
+  border-radius: 14px;
   background: rgba(233, 194, 72, 0.97);
   color: #1a1204;
   font-weight: 900;
-  font-size: 0.86rem;
+  font-size: 0.98rem;
   text-align: center;
-  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 12px 26px rgba(0, 0, 0, 0.35);
 }
 
 .hand-hint {
   display: inline-flex;
   align-self: center;
   margin: 6px 0 2px;
-  padding: 5px 14px;
+  padding: 6px 16px;
   border-radius: 999px;
   background: rgba(224, 182, 75, 0.16);
   border: 1px solid rgba(224, 182, 75, 0.4);
   color: var(--gold);
   font-weight: 800;
-  font-size: 0.8rem;
+  font-size: 0.85rem;
   letter-spacing: 0.02em;
 }
 
 .pot-stack {
   display: grid;
   justify-items: center;
-  gap: 6px;
+  gap: 7px;
 }
 
 .pot {
   display: inline-flex;
   justify-content: center;
-  min-width: 140px;
+  min-width: 168px;
   margin: 0 auto;
-  padding: 9px 14px;
+  padding: 11px 18px;
   border: 1px solid rgba(255, 255, 255, 0.18);
   border-radius: 999px;
   background: rgba(0, 0, 0, 0.3);
   color: white;
   font-weight: 900;
+  font-size: 1.02rem;
 }
 
 .round-pot {
   display: inline-flex;
   justify-content: center;
-  min-width: 120px;
-  padding: 5px 10px;
+  min-width: 140px;
+  padding: 6px 12px;
   border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: 999px;
   background: rgba(0, 0, 0, 0.18);
   color: var(--muted);
-  font-size: 0.76rem;
+  font-size: 0.84rem;
   font-weight: 800;
 }
 
 .cards {
   display: flex;
   justify-content: center;
-  gap: 8px;
+  gap: 10px;
   flex-wrap: nowrap;
 }
 
 #boardCards {
-  padding: 10px 12px;
-  border-radius: 14px;
+  padding: 13px 16px;
+  border-radius: 16px;
   background: rgba(0, 0, 0, 0.16);
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
 }
 
 .card {
-  width: clamp(40px, 5.4vw, 62px);
+  width: clamp(46px, 6.2vw, 76px);
   aspect-ratio: 0.72;
   display: grid;
   place-items: center;
-  border-radius: 8px;
+  border-radius: 9px;
   background: #fffaf2;
   color: #181818;
-  font-size: 1.05rem;
+  font-size: 1.22rem;
   font-weight: 950;
-  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.24);
+  box-shadow: 0 9px 18px rgba(0, 0, 0, 0.26);
 }
 
 .card.red {
@@ -406,13 +408,13 @@ form {
 .seat-pod {
   display: flex;
   align-items: center;
-  gap: 7px;
-  padding: 5px 11px 5px 5px;
+  gap: 8px;
+  padding: 6px 13px 6px 6px;
   border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: 999px;
   background: rgba(12, 15, 19, 0.94);
   white-space: nowrap;
-  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 7px 16px rgba(0, 0, 0, 0.32);
 }
 
 .seat.away .seat-pod {
@@ -428,12 +430,12 @@ form {
   display: grid;
   place-items: center;
   gap: 2px;
-  width: 44px;
-  height: 44px;
+  width: 52px;
+  height: 52px;
   border: 1px dashed rgba(255, 255, 255, 0.2);
   border-radius: 50%;
   color: rgba(255, 255, 255, 0.4);
-  font-size: 0.58rem;
+  font-size: 0.64rem;
   background: rgba(12, 15, 19, 0.2);
 }
 
@@ -445,19 +447,19 @@ form {
 .seat-sit {
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  font-size: 0.54rem;
+  font-size: 0.58rem;
 }
 
 .seat-number {
   display: grid;
-  width: 15px;
-  height: 15px;
+  width: 17px;
+  height: 17px;
   place-items: center;
   border-radius: 50%;
   background: rgba(255, 255, 255, 0.12);
   color: var(--gold);
   font-weight: 900;
-  font-size: 0.6rem;
+  font-size: 0.64rem;
 }
 
 .seat.turn .seat-pod {
@@ -474,13 +476,13 @@ form {
   position: relative;
   display: grid;
   place-items: center;
-  width: 30px;
-  height: 30px;
+  width: 36px;
+  height: 36px;
   border-radius: 50%;
   background: linear-gradient(160deg, #3a4a5c, #222c36);
   color: #fff;
   font-weight: 900;
-  font-size: 0.66rem;
+  font-size: 0.76rem;
   flex-shrink: 0;
 }
 
@@ -488,39 +490,39 @@ form {
   position: absolute;
   top: -6px;
   right: -6px;
-  width: 15px;
-  height: 15px;
-  font-size: 0.58rem;
+  width: 17px;
+  height: 17px;
+  font-size: 0.62rem;
 }
 
 .seat-info {
   display: flex;
   flex-direction: column;
-  gap: 1px;
-  line-height: 1.15;
+  gap: 2px;
+  line-height: 1.18;
 }
 
 .seat-name {
   font-weight: 800;
-  font-size: 0.68rem;
-  max-width: 84px;
+  font-size: 0.78rem;
+  max-width: 106px;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .seat-stack {
   color: var(--muted);
-  font-size: 0.6rem;
+  font-size: 0.68rem;
   font-weight: 700;
 }
 
 .seat-info .badge {
   align-self: flex-start;
   margin-top: 1px;
-  padding: 1px 6px;
+  padding: 2px 8px;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.08);
-  font-size: 0.52rem;
+  font-size: 0.58rem;
   font-weight: 800;
   text-transform: uppercase;
 }
@@ -547,27 +549,27 @@ form {
 
 .seat-cards {
   display: flex;
-  gap: 3px;
-  margin-bottom: 4px;
+  gap: 4px;
+  margin-bottom: 5px;
   justify-content: center;
 }
 
 .seat-cards .card {
-  width: 24px;
-  border-radius: 5px;
-  font-size: 0.62rem;
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+  width: 30px;
+  border-radius: 6px;
+  font-size: 0.76rem;
+  box-shadow: 0 5px 10px rgba(0, 0, 0, 0.32);
 }
 
 .dealer {
   display: inline-grid;
-  width: 14px;
-  height: 14px;
+  width: 15px;
+  height: 15px;
   place-items: center;
   border-radius: 50%;
   background: white;
   color: #111;
-  font-size: 0.6rem;
+  font-size: 0.62rem;
 }
 
 
@@ -703,7 +705,7 @@ form {
   @media (max-width: 960px) {
   .table-screen {
     grid-template-columns: 1fr;
-    grid-template-rows: auto minmax(480px, 64vh) auto auto;
+    grid-template-rows: auto minmax(560px, 74vh) auto auto;
   }
 
   .topbar,
@@ -721,90 +723,90 @@ form {
 
 @media (max-width: 620px) {
   .table-screen {
-    padding: 8px;
-    gap: 8px;
-  }
-
-  .table-wrap {
-    padding: 76px 44px;
-  }
-
-  .table {
-    border-width: 7px;
-    border-radius: 22px;
-    aspect-ratio: 1.15;
-  }
-
-  #boardCards {
-    padding: 7px 9px;
+    padding: 6px;
     gap: 6px;
   }
 
+  .table-wrap {
+    padding: 92px 34px;
+  }
+
+  .table {
+    border-width: 8px;
+    border-radius: 24px;
+    aspect-ratio: 1.28;
+  }
+
+  #boardCards {
+    padding: 9px 11px;
+    gap: 7px;
+  }
+
   .card {
-    width: clamp(32px, 8.6vw, 44px);
-    font-size: 0.86rem;
+    width: clamp(38px, 10.5vw, 54px);
+    font-size: 1rem;
   }
 
   .winner-banner {
-    max-width: 84%;
-    font-size: 0.7rem;
-    padding: 7px 12px;
+    max-width: 88%;
+    font-size: 0.8rem;
+    padding: 8px 14px;
   }
 
   .hand-hint {
-    font-size: 0.72rem;
-    padding: 4px 12px;
+    font-size: 0.78rem;
+    padding: 5px 14px;
   }
 
   .seat-pod {
-    padding: 4px 9px 4px 4px;
-    gap: 5px;
+    padding: 5px 11px 5px 5px;
+    gap: 6px;
   }
 
   .seat-avatar {
-    width: 25px;
-    height: 25px;
-    font-size: 0.58rem;
+    width: 30px;
+    height: 30px;
+    font-size: 0.66rem;
   }
 
   .seat-name {
-    font-size: 0.6rem;
-    max-width: 60px;
+    font-size: 0.68rem;
+    max-width: 72px;
   }
 
   .seat-stack {
-    font-size: 0.54rem;
+    font-size: 0.6rem;
   }
 
   .seat-info .badge {
-    font-size: 0.46rem;
-  }
-
-  .seat-cards .card {
-    width: 19px;
     font-size: 0.5rem;
   }
 
+  .seat-cards .card {
+    width: 24px;
+    font-size: 0.58rem;
+  }
+
   .seat-empty {
-    width: 38px;
-    height: 38px;
+    width: 44px;
+    height: 44px;
   }
 }
 
 @media (max-width: 420px) {
   .table-wrap {
-    padding: 66px 34px;
+    padding: 80px 26px;
   }
 
   .table {
-    aspect-ratio: 1.05;
+    aspect-ratio: 1.15;
   }
 
   .seat-name {
-    max-width: 50px;
+    max-width: 60px;
   }
 
   .card {
-    width: clamp(28px, 8vw, 36px);
+    width: clamp(33px, 9.6vw, 44px);
   }
 }
