@@ -56,19 +56,20 @@ let audioContext;
 const peers = new Map();
 
 const seatPositions = [
-  ["50%", "98%"],
-  ["21%", "91%"],
-  ["4%", "68%"],
-  ["4%", "38%"],
-  ["21%", "9%"],
-  ["50%", "2%"],
-  ["79%", "9%"],
-  ["96%", "38%"],
-  ["96%", "68%"],
-  ["79%", "91%"]
+  ["50%", "95%"],
+  ["22%", "88%"],
+  ["5%", "66%"],
+  ["5%", "34%"],
+  ["22%", "12%"],
+  ["50%", "5%"],
+  ["78%", "12%"],
+  ["95%", "34%"],
+  ["95%", "66%"],
+  ["78%", "88%"]
 ];
 
 nameInput.value = localStorage.getItem("pokerName") || "";
+roomInput.value = localStorage.getItem("pokerLastRoom") || "";
 
 createBtn.addEventListener("click", () => connect("createRoom"));
 joinBtn.addEventListener("click", () => connect("joinRoom"));
@@ -139,6 +140,7 @@ function connect(type) {
     const code = roomInput.value.trim().toUpperCase();
     const savedSeat = readSavedSeat(code);
     const token = type === "joinRoom" && savedSeat?.name === name ? savedSeat.token : "";
+    if (type === "joinRoom" && code) localStorage.setItem("pokerLastRoom", code);
     send(type, { name, code, token, buyIn: Number(buyInInput.value), seatNumber: Number(seatInput.value) });
   });
 
@@ -147,6 +149,7 @@ function connect(type) {
     if (message.type === "joined") {
       playerId = message.payload.playerId;
       roomCode = message.payload.roomCode;
+      localStorage.setItem("pokerLastRoom", roomCode);
       saveSeat(roomCode, nameInput.value.trim() || "Player", message.payload.token);
       joinPanel.classList.add("hidden");
       tableScreen.classList.remove("hidden");
@@ -162,7 +165,7 @@ function connect(type) {
   socket.addEventListener("close", () => {
     createBtn.disabled = false;
     joinBtn.disabled = false;
-    addMessage("Table", "Connection closed. Refresh to rejoin.");
+    addMessage("Table", "Connection closed.");
   });
 
   socket.addEventListener("error", () => {
@@ -211,14 +214,11 @@ function renderWinnerBanner(previous) {
       : `${names} wins ${win.amount}${handText}`;
     winnerBanner.classList.remove("hidden");
     clearTimeout(winnerBannerTimeout);
-    winnerBannerTimeout = setTimeout(() => {
-      winnerBanner.classList.add("hidden");
-    }, 6000);
+    winnerBannerTimeout = setTimeout(() => winnerBanner.classList.add("hidden"), 5000);
   }
-  if (state.phase !== "showdown" && !state.lastWin) {
-    winnerBanner.classList.add("hidden");
-  }
+  if (state.phase !== "showdown" && !state.lastWin) winnerBanner.classList.add("hidden");
 }
+
 
 function renderSeats() {
   seats.innerHTML = "";
@@ -232,17 +232,15 @@ function renderSeats() {
     seat.style.left = position[0];
     seat.style.top = position[1];
     seat.style.transform = "translate(-50%, -50%)";
-
     if (!player) {
       seat.innerHTML = `<div class="seat-number">${seatNumber}</div><span class="seat-sit">Sit</span>`;
       seats.appendChild(seat);
       continue;
     }
-
     const status = player.sittingOut ? "Away" : player.stack === 0 ? "Broke" : player.folded ? "Folded" : player.allIn ? "All-in" : !player.connected ? "Offline" : "";
     const statusBadge = status ? `<span class="badge ${status === "Folded" || status === "Broke" ? "warn" : ""}">${status}</span>` : "";
     const betBadge = player.bet ? `<span class="badge bet">${player.bet}</span>` : "";
-    const winBadge = player.wonHand ? `<span class="badge win">Winner</span>` : "";
+    const winBadge = player.wonHand ? '<span class="badge win">Winner</span>' : "";
     seat.innerHTML = `
       <div class="cards seat-cards"></div>
       <div class="seat-pod">
@@ -258,6 +256,7 @@ function renderSeats() {
     seats.appendChild(seat);
   }
 }
+
 
 function seatPosition(seatNumber) {
   return seatPositions[(seatNumber - 1) % seatPositions.length];
@@ -571,6 +570,7 @@ function readSavedSeat(code) {
 
 function saveSeat(code, name, token) {
   localStorage.setItem(`pokerSeat:${code}`, JSON.stringify({ name, token }));
+  localStorage.setItem("pokerLastRoom", code);
 }
 
 function suitSymbol(suit) {
@@ -580,6 +580,20 @@ function suitSymbol(suit) {
 function isRed(card) {
   return card.suit === "H" || card.suit === "D";
 }
+
+function tryAutoReconnect() {
+  const code = (localStorage.getItem("pokerLastRoom") || "").trim().toUpperCase();
+  const name = (localStorage.getItem("pokerName") || "").trim();
+  const savedSeat = code ? readSavedSeat(code) : null;
+  if (!code || !name || !savedSeat?.token || savedSeat?.name !== name || socket) return;
+  roomInput.value = code;
+  notice.textContent = "Reconnecting...";
+  connect("joinRoom");
+}
+
+window.addEventListener("load", () => {
+  setTimeout(tryAutoReconnect, 120);
+});
 
 function titleCase(text) {
   return text.charAt(0).toUpperCase() + text.slice(1);

@@ -626,11 +626,9 @@ function showdown(room) {
   const best = ranked[0];
   const winners = ranked.filter((entry) => compareScores(entry.score, best.score) === 0);
   const share = Math.floor(room.pot / winners.length);
-
   room.players.forEach((player) => {
     player.cardsDecided = false;
   });
-
   winners.forEach((entry) => {
     entry.player.stack += share;
     entry.player.showCards = true;
@@ -640,12 +638,10 @@ function showdown(room) {
     entry.player.stats.chipsWon += share;
     entry.player.stats.biggestPot = Math.max(entry.player.stats.biggestPot, share);
   });
-
   const winnerIds = new Set(winners.map((entry) => entry.player.id));
   contenders.forEach((player) => {
     if (!winnerIds.has(player.id)) player.wonHand = false;
   });
-
   room.log.unshift(`${winners.map((entry) => entry.player.name).join(", ")} win ${share} with ${best.score.name}.`);
   room.lastWin = {
     winners: winners.map((entry) => ({ name: entry.player.name, amount: share })),

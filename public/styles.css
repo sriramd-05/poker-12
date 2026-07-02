@@ -266,50 +266,57 @@ form {
 
 .table-wrap {
   position: relative;
-  padding: 96px 68px;
+  padding: 90px 58px;
 }
 
 .table {
   position: relative;
-  width: min(100%, 780px);
-  aspect-ratio: 1.5;
+  width: min(100%, 820px);
+  aspect-ratio: 1.25;
   margin: 0 auto;
-  border: 10px solid #3a2415;
-  border-radius: 48% / 52%;
+  border: 12px solid #353535;
+  border-radius: 28px;
   background:
+    linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.01)),
     radial-gradient(circle at center, rgba(255,255,255,0.10), transparent 38%),
     radial-gradient(circle at 50% 50%, var(--felt) 0%, var(--felt-dark) 78%);
-  box-shadow: inset 0 0 0 6px rgba(224, 182, 75, 0.18), inset 0 0 70px rgba(0, 0, 0, 0.5), 0 20px 70px rgba(0, 0, 0, 0.3);
+  box-shadow: inset 0 0 0 4px rgba(255,255,255,0.08), inset 0 0 50px rgba(0,0,0,0.45), 0 20px 70px rgba(0,0,0,0.3);
 }
 
 .board-zone {
   position: absolute;
-  top: 50%;
-  left: 50%;
+  inset: 0;
   display: grid;
-  gap: 12px;
-  transform: translate(-50%, -50%);
-  text-align: center;
+  align-content: center;
+  justify-items: center;
+  gap: 14px;
   z-index: 2;
 }
 
 .winner-banner {
-  padding: 8px 16px;
-  border-radius: 999px;
-  background: rgba(224, 182, 75, 0.95);
+  max-width: min(86%, 520px);
+  padding: 10px 18px;
+  border-radius: 14px;
+  background: rgba(233, 194, 72, 0.97);
   color: #1a1204;
   font-weight: 900;
-  font-size: 0.86rem;
+  font-size: 0.92rem;
+  text-align: center;
   box-shadow: 0 10px 24px rgba(0, 0, 0, 0.35);
-  white-space: nowrap;
+}
+
+.pot-stack {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
 }
 
 .pot {
   display: inline-flex;
   justify-content: center;
-  min-width: 120px;
+  min-width: 156px;
   margin: 0 auto;
-  padding: 8px 12px;
+  padding: 10px 16px;
   border: 1px solid rgba(255, 255, 255, 0.18);
   border-radius: 999px;
   background: rgba(0, 0, 0, 0.28);
@@ -317,21 +324,11 @@ form {
   font-weight: 900;
 }
 
-.pot-stack {
-  display: grid;
-  justify-items: center;
-  gap: 6px;
-}
-
-.total-pot {
-  min-width: 150px;
-}
-
 .round-pot {
   display: inline-flex;
   justify-content: center;
-  min-width: 128px;
-  padding: 5px 10px;
+  min-width: 132px;
+  padding: 6px 12px;
   border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: 999px;
   background: rgba(0, 0, 0, 0.18);
@@ -343,38 +340,40 @@ form {
 .cards {
   display: flex;
   justify-content: center;
-  gap: 8px;
+  gap: 10px;
+}
+
+#boardCards {
+  padding: 12px 14px;
+  border-radius: 18px;
+  background: rgba(0, 0, 0, 0.14);
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.06);
 }
 
 .card {
-  width: clamp(48px, 6.5vw, 70px);
+  width: clamp(48px, 6vw, 72px);
   aspect-ratio: 0.72;
   display: grid;
   place-items: center;
   border-radius: 8px;
   background: #fffaf2;
   color: #181818;
-  font-size: 1.2rem;
+  font-size: 1.18rem;
   font-weight: 950;
   box-shadow: 0 8px 16px rgba(0, 0, 0, 0.24);
 }
 
-.card.red {
-  color: #c32636;
-}
-
+.card.red { color: #c32636; }
 .card.back {
   background: repeating-linear-gradient(45deg, #284d9a, #284d9a 8px, #203d78 8px, #203d78 16px);
   color: transparent;
 }
-
 .card.empty {
   border: 1px dashed rgba(255, 255, 255, 0.24);
   background: rgba(0, 0, 0, 0.16);
   box-shadow: none;
 }
 
-/* ---- Seats: positioned in the table-wrap padding ring around the felt (PokerNow-style) ---- */
 .seat {
   position: absolute;
   width: auto;
@@ -396,39 +395,26 @@ form {
   box-shadow: 0 6px 16px rgba(0, 0, 0, 0.28);
 }
 
-.seat.away .seat-pod {
-  opacity: 0.55;
-}
-
+.seat.away .seat-pod { opacity: 0.55; }
 .seat.winner .seat-pod {
   border-color: var(--gold);
-  box-shadow: 0 0 0 3px rgba(224, 182, 75, 0.45), 0 6px 20px rgba(224, 182, 75, 0.3);
+  box-shadow: 0 0 0 3px rgba(224, 182, 75, 0.42), 0 6px 20px rgba(224, 182, 75, 0.28);
 }
 
 .seat-empty {
   display: grid;
   place-items: center;
   gap: 2px;
-  width: 50px;
-  height: 50px;
+  width: 46px;
+  height: 46px;
   border: 1px dashed rgba(255, 255, 255, 0.22);
   border-radius: 50%;
-  color: rgba(255, 255, 255, 0.4);
-  font-size: 0.62rem;
-  background: rgba(12, 15, 19, 0.2);
+  color: rgba(255, 255, 255, 0.42);
+  font-size: 0.6rem;
+  background: rgba(12, 15, 19, 0.18);
 }
-
-.seat-empty .seat-number {
-  position: static;
-  margin: 0;
-}
-
-.seat-sit {
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  font-size: 0.56rem;
-}
-
+.seat-empty .seat-number { position: static; margin: 0; }
+.seat-sit { text-transform: uppercase; letter-spacing: 0.05em; font-size: 0.55rem; }
 .seat-number {
   display: grid;
   width: 16px;
@@ -440,17 +426,8 @@ form {
   font-weight: 900;
   font-size: 0.62rem;
 }
-
-.seat.turn .seat-pod {
-  border-color: var(--gold);
-  box-shadow: 0 0 0 2px rgba(224, 182, 75, 0.3);
-}
-
-.seat.me .seat-pod {
-  background: rgba(25, 54, 68, 0.94);
-  border-color: rgba(120, 200, 220, 0.4);
-}
-
+.seat.turn .seat-pod { border-color: var(--gold); box-shadow: 0 0 0 2px rgba(224, 182, 75, 0.3); }
+.seat.me .seat-pod { background: rgba(25, 54, 68, 0.94); border-color: rgba(120, 200, 220, 0.4); }
 .seat-avatar {
   position: relative;
   display: grid;
@@ -464,7 +441,6 @@ form {
   font-size: 0.74rem;
   flex-shrink: 0;
 }
-
 .seat-avatar .dealer {
   position: absolute;
   top: -6px;
@@ -473,28 +449,15 @@ form {
   height: 16px;
   font-size: 0.62rem;
 }
-
-.seat-info {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  line-height: 1.18;
-}
-
+.seat-info { display: flex; flex-direction: column; gap: 1px; line-height: 1.18; }
 .seat-name {
   font-weight: 800;
   font-size: 0.76rem;
-  max-width: 100px;
+  max-width: 94px;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-
-.seat-stack {
-  color: var(--muted);
-  font-size: 0.66rem;
-  font-weight: 700;
-}
-
+.seat-stack { color: var(--muted); font-size: 0.66rem; font-weight: 700; }
 .seat-info .badge {
   align-self: flex-start;
   margin-top: 1px;
@@ -505,36 +468,21 @@ form {
   font-weight: 800;
   text-transform: uppercase;
 }
-
-.seat-info .badge.bet {
-  background: rgba(224, 182, 75, 0.2);
-  color: var(--gold);
-}
-
-.seat-info .badge.warn {
-  background: rgba(217, 77, 77, 0.25);
-  color: #ff9d9d;
-}
-
-.seat-info .badge.win {
-  background: rgba(224, 182, 75, 0.9);
-  color: #1a1204;
-}
-
+.seat-info .badge.bet { background: rgba(224, 182, 75, 0.2); color: var(--gold); }
+.seat-info .badge.warn { background: rgba(217, 77, 77, 0.25); color: #ff9d9d; }
+.seat-info .badge.win { background: rgba(224, 182, 75, 0.92); color: #1a1204; }
 .seat-cards {
   display: flex;
   gap: 3px;
   margin-bottom: 4px;
   justify-content: center;
 }
-
 .seat-cards .card {
-  width: 30px;
+  width: 24px;
   border-radius: 6px;
-  font-size: 0.82rem;
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.32);
+  font-size: 0.68rem;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.32);
 }
-
 .dealer {
   display: inline-grid;
   width: 14px;
@@ -702,84 +650,80 @@ form {
   }
 
   .table-wrap {
-    padding: 78px 50px;
+    padding: 72px 42px;
   }
 
   .table {
-    border-width: 7px;
-    aspect-ratio: 1.3;
+    border-width: 8px;
+    border-radius: 20px;
+    aspect-ratio: 1.1;
+  }
+
+  #boardCards {
+    padding: 8px 10px;
+    gap: 8px;
+  }
+
+  .card {
+    width: clamp(36px, 10vw, 48px);
+    font-size: 0.94rem;
+  }
+
+  .winner-banner {
+    max-width: 82%;
+    font-size: 0.76rem;
+    padding: 8px 12px;
   }
 
   .seat-pod {
-    padding: 5px 10px 5px 5px;
+    padding: 5px 9px 5px 5px;
     gap: 6px;
   }
 
   .seat-avatar {
     width: 28px;
     height: 28px;
-    font-size: 0.64rem;
+    font-size: 0.62rem;
   }
 
   .seat-name {
     font-size: 0.68rem;
-    max-width: 72px;
+    max-width: 66px;
   }
 
   .seat-stack {
-    font-size: 0.6rem;
+    font-size: 0.58rem;
   }
 
   .seat-info .badge {
-    font-size: 0.5rem;
-  }
-
-  .seat-empty {
-    width: 42px;
-    height: 42px;
+    font-size: 0.48rem;
   }
 
   .seat-cards .card {
-    width: 24px;
-    font-size: 0.66rem;
+    width: 20px;
+    font-size: 0.56rem;
   }
 
-  .card {
-    width: clamp(38px, 9.5vw, 50px);
-    font-size: 0.92rem;
-  }
-
-  .pot {
-    font-size: 0.8rem;
-    min-width: 100px;
-    padding: 6px 10px;
-  }
-
-  .round-pot {
-    font-size: 0.68rem;
-    min-width: 100px;
-  }
-
-  .winner-banner {
-    font-size: 0.74rem;
-    padding: 6px 12px;
+  .seat-empty {
+    width: 40px;
+    height: 40px;
   }
 }
 
 @media (max-width: 420px) {
   .table-wrap {
-    padding: 66px 38px;
+    padding: 64px 34px;
+  }
+
+  .table {
+    aspect-ratio: 1.02;
   }
 
   .seat-name {
-    max-width: 56px;
-  }
-
-  .seat-cards .card {
-    width: 21px;
+    max-width: 54px;
   }
 
   .card {
-    width: clamp(32px, 9vw, 42px);
+    width: clamp(31px, 9vw, 40px);
   }
 }
