@@ -205,6 +205,7 @@ rejoinSeatBtn.addEventListener("click", () => {
 });
 
 menuBtn.addEventListener("click", () => optionsMenu.classList.toggle("hidden"));
+pauseBtn?.addEventListener("click", togglePause);
 document.addEventListener("click", (e) => {
   if (optionsMenu.classList.contains("hidden")) return;
   if (!optionsMenu.contains(e.target) && !menuBtn.contains(e.target))
@@ -580,6 +581,25 @@ function renderLog() {
 }
 
 function renderChipRequests() {
+  const me = state?.players?.find((p) => p.id === playerId);
+  const isOwner = Boolean(me?.isOwner);
+  if (!chipRequestToast) return;
+  if (!isOwner || !state?.chipRequests?.length) {
+    chipRequestToast.classList.add('hidden');
+    chipRequestToast.innerHTML = '';
+    return;
+  }
+  const latest = state.chipRequests[state.chipRequests.length - 1];
+  chipRequestToast.classList.remove('hidden');
+  chipRequestToast.innerHTML = `<strong>${escapeHtml(latest.name)}</strong> requested <strong>${latest.amount}</strong> chips <button data-request-id="${latest.id}" data-amount="${latest.amount}">Add chips</button>`;
+
+  const isOwner = state?.players?.find((p) => p.id === playerId)?.isOwner;
+  if (chipRequestToast) chipRequestToast.classList.toggle('hidden', !isOwner || !state?.chipRequests?.length);
+  if (chipRequestToast && isOwner && state?.chipRequests?.length) {
+    const latest = state.chipRequests[state.chipRequests.length - 1];
+    chipRequestToast.innerHTML = `<strong>${escapeHtml(latest.name)}</strong> requested <strong>${latest.amount}</strong> chips <button data-request-id="${latest.id}" data-amount="${latest.amount}">Add chips</button>`;
+  }
+
   const me = state.players.find((p) => p.id === playerId);
   const isOwner = state.ownerId === playerId;
   chipsForm.classList.toggle("hidden", !me || (me.stack > 0 && state.phase !== "showdown"));
@@ -611,6 +631,20 @@ function renderStats() {
 }
 
 function renderLedger() {
+  ledgerPanel.innerHTML = '';
+  const rows = (state?.ledger || []).slice(0, 8);
+  const wrap = document.createElement('div');
+  wrap.className = 'ledger-panel';
+  wrap.innerHTML = `<h3>Session Ledger</h3><div class='ledger-row header'><div>PLAYER</div><div>BUY-IN</div><div>BUY-OUT</div><div>STACK</div><div>NET</div></div>`;
+  rows.forEach((entry) => {
+    const net = (entry.stack || 0) - (entry.buyIn || 0);
+    const row = document.createElement('div');
+    row.className = 'ledger-row';
+    row.innerHTML = `<div><strong>${escapeHtml(entry.name || '')}</strong></div><div>${entry.buyIn ?? ''}</div><div>${entry.buyOut ?? 0}</div><div>${entry.stack ?? 0}</div><div class='${net >= 0 ? 'net-positive' : 'net-negative'}'>${net >= 0 ? '+' : ''}${net}</div>`;
+    wrap.appendChild(row);
+  });
+  ledgerPanel.appendChild(wrap);
+
   ledgerPanel.innerHTML = "";
   if (!state.ledger?.length) { ledgerPanel.innerHTML = '<p class="muted-line">No activity yet.</p>'; return; }
   state.ledger.forEach((e) => {
@@ -909,4 +943,13 @@ function togglePause() {
   if (!state) return;
   send("pauseGame", { paused: !state.paused });
   optionsMenu?.classList.add("hidden");
+}
+
+
+function updateControlTurnState() {
+  if (!controls || !state) return;
+  const me = state.players?.find((p) => p.id === playerId);
+  const myTurn = Boolean(me && state.players?.[state.turnIndex]?.id === me.id && !state.paused);
+  controls.classList.toggle('turn-active', myTurn);
+  controls.classList.toggle('turn-wait', !myTurn);
 }
