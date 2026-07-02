@@ -917,3 +917,150 @@ h3 { margin-bottom: 12px; font-size: 1rem; }
 
 .controls form { display: block; }
 .controls .actions, .controls .raise-row, .controls .quick-bets { width: 100%; }
+
+
+.player-box,
+.seat-pod {
+  padding: 6px 8px;
+  border-radius: 10px;
+}
+
+.seat {
+  min-height: 70px;
+}
+
+.seat-name {
+  font-size: 0.78rem;
+}
+
+.seat-stack,
+.seat-meta,
+.seat-bet {
+  font-size: 0.68rem;
+}
+
+.seat-cards {
+  display: flex;
+  gap: 2px;
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 4px);
+  transform: translateX(-50%);
+}
+
+.seat-cards .card {
+  width: 22px;
+  height: 30px;
+  border-radius: 4px;
+  font-size: 0.55rem;
+  line-height: 1;
+  overflow: hidden;
+}
+
+.seat-cards .card .corner {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  line-height: 0.9;
+}
+
+.seat-cards .card .corner.top-left { top: 3px; left: 3px; }
+.seat-cards .card .corner.bottom-right { right: 3px; bottom: 3px; transform: rotate(180deg); }
+
+.seat-cards .card .rank {
+  font-size: 0.56rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.seat-cards .card .suit {
+  font-size: 0.48rem;
+  line-height: 1;
+  display: inline-block;
+  transform: translateY(-1px);
+}
+
+.seat-cards .card.red .suit,
+.seat-cards .card.red .rank {
+  color: #d64545;
+}
+
+.seat-cards .card.black .suit,
+.seat-cards .card.black .rank {
+  color: #111;
+}
+
+@media (max-width: 720px) {
+  .topbar,
+  .controls,
+  .side,
+  .table-wrap {
+    width: 100%;
+  }
+
+  .topbar {
+    display: none;
+  }
+
+  .table-screen {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 8px;
+  }
+
+  .dropdown-row,
+  .header-row,
+  .summary-row,
+  .stats-row {
+    order: 0;
+  }
+
+  .table-wrap {
+    order: 1;
+  }
+
+  .controls {
+    order: 2;
+    margin-top: 0;
+    padding: 10px;
+  }
+
+  .seat {
+    width: 74px;
+    min-height: 62px;
+  }
+
+  .seat-cards {
+    bottom: calc(100% + 2px);
+  }
+
+  .seat-cards .card {
+    width: 18px;
+    height: 26px;
+  }
+
+  .actions,
+  .quick-bets {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+  }
+
+  .actions button,
+  .quick-bet {
+    width: 100%;
+    min-width: 0 !important;
+  }
+
+  .turn-status,
+  .game-info,
+  .player-summary {
+    margin-bottom: 6px;
+  }
+
+  .controls .status {
+    margin-bottom: 6px;
+  }
+}
