@@ -27,8 +27,6 @@ const timerLabel = document.querySelector("#timerLabel");
 const raiseInput = document.querySelector("#raiseInput");
 const messages = document.querySelector("#messages");
 const chatForm = document.querySelector("#chatForm");
-const controls = document.querySelector("#controls");
-const chipRequestToast = document.querySelector("#chipRequestToast");
 const chatInput = document.querySelector("#chatInput");
 const handLog = document.querySelector("#handLog");
 const voicePeers = document.querySelector("#voicePeers");
@@ -56,16 +54,16 @@ let audioContext;
 const peers = new Map();
 
 const seatPositions = [
-  ["50.0%", "90.0%"],
-  ["24.1%", "82.4%"],
-  ["8.2%", "62.4%"],
-  ["8.2%", "37.6%"],
-  ["24.1%", "17.6%"],
-  ["50.0%", "10.0%"],
-  ["75.9%", "17.6%"],
-  ["91.8%", "37.6%"],
-  ["91.8%", "62.4%"],
-  ["75.9%", "82.4%"]
+  ["50%", "98%"],
+  ["21%", "91%"],
+  ["4%", "68%"],
+  ["4%", "38%"],
+  ["21%", "9%"],
+  ["50%", "2%"],
+  ["79%", "9%"],
+  ["96%", "38%"],
+  ["96%", "68%"],
+  ["79%", "91%"]
 ];
 
 nameInput.value = localStorage.getItem("pokerName") || "";
@@ -191,7 +189,6 @@ function render(nextState) {
   renderChipRequests();
   renderStats();
   renderLedger();
-  updateControlTurnState();
   renderRejoinBar();
   reactToStateChange(previous, state);
 }
@@ -210,7 +207,7 @@ function renderSeats() {
     seat.style.transform = "translate(-50%, -50%)";
 
     if (!player) {
-      seat.innerHTML = `<div class="seat-number">${seatNumber}</div><span>Open</span>`;
+      seat.innerHTML = `<div class="seat-number">${seatNumber}</div><span class="seat-sit">Sit</span>`;
       seats.appendChild(seat);
       continue;
     }
@@ -219,12 +216,15 @@ function renderSeats() {
     const statusBadge = status ? `<span class="badge ${status === "Folded" || status === "Broke" ? "warn" : ""}">${status}</span>` : "";
     const betBadge = player.bet ? `<span class="badge bet">${player.bet}</span>` : "";
     seat.innerHTML = `
-      <div class="seat-name">
-        <span>${escapeHtml(player.name)}${player.isOwner ? " *" : ""}</span>
-        ${player.dealer ? '<span class="dealer">D</span>' : ""}
-      </div>
       <div class="cards seat-cards"></div>
-      <div class="seat-meta"><span class="stack">${player.stack}</span>${statusBadge || betBadge}</div>
+      <div class="seat-pod">
+        <div class="seat-avatar">${initials(player.name)}${player.dealer ? '<span class="dealer">D</span>' : ""}</div>
+        <div class="seat-info">
+          <span class="seat-name">${escapeHtml(player.name)}${player.isOwner ? " *" : ""}</span>
+          <span class="seat-stack">${player.stack}</span>
+          ${statusBadge || betBadge}
+        </div>
+      </div>
     `;
     renderCards(seat.querySelector(".seat-cards"), player.cards);
     seats.appendChild(seat);
@@ -410,6 +410,10 @@ function togglePause() {
   send("pauseGame", { paused: !state.paused });
 }
 
+function initials(name) {
+  return String(name).trim().split(/\s+/).slice(0, 2).map((w) => w[0]?.toUpperCase() || "").join("") || "?";
+}
+
 function rankLabel(rank) {
   return rank === "T" ? "10" : rank;
 }
@@ -559,12 +563,4 @@ function escapeHtml(text) {
     '"': "&quot;",
     "'": "&#039;"
   }[char]));
-}
-
-
-function updateControlTurnState() {
-  if (!controls || !state || !playerId) return;
-  const me = state.players?.find((p) => p.id === playerId);
-  const myTurn = Boolean(me && state.players?.[state.turnIndex]?.id === me.id && !state.paused);
-  controls.classList.toggle('turn-active', myTurn);
 }
