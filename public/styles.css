@@ -266,13 +266,13 @@ form {
 
 .table-wrap {
   position: relative;
-  padding: 70px 36px;
+  padding: 52px 28px;
 }
 
 .table {
   position: relative;
   width: min(100%, 900px);
-  aspect-ratio: 1.35;
+  aspect-ratio: 1.75;
   margin: 0 auto;
   border: 12px solid #3a2415;
   border-radius: 32px;
@@ -366,14 +366,14 @@ form {
 }
 
 .card {
-  width: clamp(40px, 5.4vw, 62px);
+  width: clamp(44px, 6vw, 72px);
   aspect-ratio: 0.72;
   display: grid;
   place-items: center;
   border-radius: 8px;
   background: #fffaf2;
   color: #181818;
-  font-size: 1.05rem;
+  font-size: 1.15rem;
   font-weight: 950;
   box-shadow: 0 8px 16px rgba(0, 0, 0, 0.24);
 }
@@ -687,7 +687,7 @@ form {
   @media (max-width: 960px) {
   .table-screen {
     grid-template-columns: 1fr;
-    grid-template-rows: auto minmax(480px, 64vh) auto auto;
+    grid-template-rows: auto minmax(300px, 52vh) auto auto;
   }
 
   .topbar,
@@ -710,23 +710,23 @@ form {
   }
 
   .table-wrap {
-    padding: 54px 28px;
+    padding: 36px 16px;
   }
 
   .table {
     border-width: 7px;
     border-radius: 22px;
-    aspect-ratio: 1.15;
+    aspect-ratio: 1.7;
   }
 
   #boardCards {
-    padding: 7px 9px;
+    padding: 8px 10px;
     gap: 6px;
   }
 
   .card {
-    width: clamp(32px, 8.6vw, 44px);
-    font-size: 0.86rem;
+    width: clamp(38px, 10.5vw, 56px);
+    font-size: 0.95rem;
   }
 
   .winner-banner {
@@ -765,23 +765,18 @@ form {
   }
 
   .seat-cards .card {
-    width: 19px;
-    font-size: 0.5rem;
-  }
-
-  .seat-empty {
-    width: 38px;
-    height: 38px;
+    width: 22px;
+    font-size: 0.52rem;
   }
 }
 
 @media (max-width: 420px) {
   .table-wrap {
-    padding: 48px 22px;
+    padding: 30px 12px;
   }
 
   .table {
-    aspect-ratio: 1.05;
+    aspect-ratio: 1.6;
   }
 
   .seat-name {
@@ -789,7 +784,7 @@ form {
   }
 
   .card {
-    width: clamp(28px, 8vw, 36px);
+    width: clamp(34px, 9.5vw, 48px);
   }
 }
 
