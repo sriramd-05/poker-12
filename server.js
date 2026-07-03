@@ -447,6 +447,7 @@ function leaveSeat(client) {
   room.chipRequests = room.chipRequests.filter((item) => item.playerId !== player.id);
   addLedger(room, "leave", player, `${player.name} left seat ${oldSeat} with ${player.stack} chips.`);
   broadcast(room, "system", { message: `${player.name} left the table with ${player.stack} chips.` });
+  maybeTransferOwner(room, player);
   if (wasTurn && room.phase !== "waiting" && room.phase !== "showdown") {
     afterAction(room);
     return;
@@ -542,6 +543,7 @@ function startHand(room) {
   room.players.forEach((player) => {
     player.hand = player.seatNumber && player.stack > 0 && !player.sittingOut ? [room.deck.pop(), room.deck.pop()] : [];
     player.bet = 0;
+    player.totalBet = 0; // cumulative chips put in across all betting rounds this hand
     player.folded = player.stack <= 0;
     player.allIn = false;
     player.acted = false;
@@ -595,6 +597,7 @@ function bettingRoundComplete(room) {
 
 function advancePhase(room) {
   room.players.forEach((player) => {
+    player.totalBet = (player.totalBet || 0) + player.bet;
     player.bet = 0;
     player.acted = false;
   });
@@ -635,42 +638,159 @@ function resetActed(room) {
 
 function showdown(room) {
   clearTurnTimer(room);
-  const contenders = room.players.filter((player) => player.hand.length && !player.folded);
-  const ranked = contenders
-    .map((player) => ({ player, score: bestHand([...player.hand, ...room.board]) }))
-    .sort((a, b) => compareScores(b.score, a.score));
-  const best = ranked[0];
-  const winners = ranked.filter((entry) => compareScores(entry.score, best.score) === 0);
-  const share = Math.floor(room.pot / winners.length);
-  room.players.forEach((player) => { player.cardsDecided = false; });
-  winners.forEach((entry) => {
-    entry.player.stack += share;
-    entry.player.showCards = true;
-    entry.player.cardsDecided = true;
-    entry.player.wonHand = true;
-    entry.player.stats.wins += 1;
-    entry.player.stats.chipsWon += share;
-    entry.player.stats.biggestPot = Math.max(entry.player.stats.biggestPot, share);
+
+  // Finalise totalBet for the last betting round (river bets haven't been flushed by advancePhase yet).
+  room.players.forEach((player) => {
+    player.totalBet = (player.totalBet || 0) + player.bet;
   });
-  const winnerIds = new Set(winners.map((entry) => entry.player.id));
-  contenders.forEach((player) => { if (!winnerIds.has(player.id)) player.wonHand = false; });
-  room.log.unshift(`${winners.map((entry) => entry.player.name).join(", ")} win ${share} with ${best.score.name}.`);
-  room.lastWin = {
-    winners: winners.map((entry) => ({ name: entry.player.name, amount: share })),
-    handName: best.score.name,
-    amount: share,
-    at: Date.now()
-  };
+
+  const contenders = room.players.filter((player) => player.hand.length && !player.folded);
+  room.players.forEach((player) => { player.cardsDecided = false; player.wonHand = false; });
+
+  // Score every contender once.
+  const scored = contenders.map((player) => ({
+    player,
+    score: bestHand([...player.hand, ...room.board])
+  }));
+
+  // Build side pots. Each distinct all-in contribution level creates a new pot layer.
+  // Players who contributed more than a given level are eligible for higher pots.
+  const sidePots = buildSidePots(room.players);
+
+  const allWinners = []; // { name, amount } for lastWin summary
+  const handsShown = new Set(); // track who we've already recorded a win log for
+
+  for (const pot of sidePots) {
+    const eligible = scored.filter((entry) => pot.eligible.has(entry.player.id));
+    if (!eligible.length) {
+      // No eligible contenders — give back to contributors (edge case: shouldn't happen in normal play).
+      continue;
+    }
+    eligible.sort((a, b) => compareScores(b.score, a.score));
+    const best = eligible[0];
+    const potWinners = eligible.filter((entry) => compareScores(entry.score, best.score) === 0);
+    const share = Math.floor(pot.amount / potWinners.length);
+    const remainder = pot.amount - share * potWinners.length;
+
+    potWinners.forEach((entry, i) => {
+      const awarded = share + (i === 0 ? remainder : 0); // first winner absorbs odd chip
+      entry.player.stack += awarded;
+      entry.player.showCards = true;
+      entry.player.cardsDecided = true;
+      entry.player.wonHand = true;
+      entry.player.stats.chipsWon += awarded;
+      entry.player.stats.biggestPot = Math.max(entry.player.stats.biggestPot, awarded);
+      allWinners.push({ name: entry.player.name, amount: awarded });
+    });
+
+    // Only count stats.wins once per player (they may win multiple side pots).
+    potWinners.forEach((entry) => {
+      if (!handsShown.has(entry.player.id)) {
+        entry.player.stats.wins += 1;
+        handsShown.add(entry.player.id);
+      }
+    });
+
+    const winnerNames = potWinners.map((e) => e.player.name).join(", ");
+    const potLabel = sidePots.length > 1 ? (pot.label || "pot") : "pot";
+    room.log.unshift(`${winnerNames} win ${pot.amount} (${potLabel}) with ${best.score.name}.`);
+  }
+
+  // Show cards for non-winning contenders who were involved in a side pot showdown.
+  contenders.forEach((player) => {
+    if (!player.wonHand) {
+      player.showCards = true; // losing hands in a contested pot are always revealed
+    }
+  });
+
   room.pot = 0;
   room.phase = "showdown";
   room.turnIndex = -1;
+
+  // Summarise for the winner banner. Group by hand name if all pots had the same winner.
+  const uniqueWinnerNames = [...new Set(allWinners.map((w) => w.name))];
+  const totalAwarded = allWinners.reduce((sum, w) => sum + w.amount, 0);
+  const primaryScore = scored.sort((a, b) => compareScores(b.score, a.score))[0];
+  room.lastWin = {
+    winners: uniqueWinnerNames.map((name) => ({
+      name,
+      amount: allWinners.filter((w) => w.name === name).reduce((s, w) => s + w.amount, 0)
+    })),
+    handName: sidePots.length === 1 ? primaryScore.score.name : null,
+    amount: totalAwarded,
+    at: Date.now()
+  };
+
   broadcastState(room);
   scheduleAutoStart(room);
+}
+
+// Build an ordered list of side pots from the chips all players put in this hand.
+// Each pot covers the contribution level from the previous cap up to the next all-in player's cap.
+function buildSidePots(players) {
+  // Only players who contributed chips are relevant.
+  const contributors = players.filter((p) => (p.totalBet || 0) > 0);
+  if (!contributors.length) return [{ amount: 0, eligible: new Set(), label: "main pot" }];
+
+  // All-in players define contribution caps (sorted ascending).
+  const allInCaps = [...new Set(
+    contributors
+      .filter((p) => p.allIn || p.stack === 0)
+      .map((p) => p.totalBet)
+  )].sort((a, b) => a - b);
+
+  // If nobody is all-in, there's just one pot and all contenders are eligible.
+  const contenders = players.filter((p) => p.hand && p.hand.length && !p.folded);
+  if (!allInCaps.length) {
+    const total = contributors.reduce((sum, p) => sum + (p.totalBet || 0), 0);
+    return [{ amount: total, eligible: new Set(contenders.map((p) => p.id)), label: "main pot" }];
+  }
+
+  const pots = [];
+  let prevCap = 0;
+
+  const caps = [...allInCaps, Infinity]; // Infinity catches the final pot above all all-in levels
+  for (const cap of caps) {
+    let potAmount = 0;
+    const eligible = new Set();
+
+    for (const player of contributors) {
+      const contribution = Math.min(player.totalBet || 0, cap) - Math.min(player.totalBet || 0, prevCap);
+      potAmount += contribution;
+    }
+
+    if (potAmount <= 0) continue;
+
+    // Eligible = contenders who contributed chips into this pot layer (totalBet > prevCap).
+    for (const player of contenders) {
+      if ((player.totalBet || 0) > prevCap) {
+        eligible.add(player.id);
+      }
+    }
+
+    // If no eligible contenders can contest this pot (all folded), give it back to the
+    // contributors who funded this layer — they win uncontested.
+    if (!eligible.size) {
+      for (const player of contributors) {
+        if ((player.totalBet || 0) > prevCap) eligible.add(player.id);
+      }
+    }
+
+    const label = pots.length === 0 ? "main pot" : `side pot ${pots.length}`;
+    pots.push({ amount: potAmount, eligible, label });
+    prevCap = cap;
+
+    if (cap === Infinity) break;
+  }
+
+  return pots;
 }
 
 
 function awardPot(room, player, message) {
   clearTurnTimer(room);
+  // Finalise totalBet for the current (possibly last) betting round.
+  room.players.forEach((p) => { p.totalBet = (p.totalBet || 0) + p.bet; });
   const won = room.pot;
   player.stack += won;
   player.cardsDecided = false;
@@ -779,6 +899,7 @@ function publicState(room, viewerId) {
     board: room.board,
     pot: room.pot,
     roundPot: room.players.reduce((sum, player) => sum + player.bet, 0),
+    sidePots: room.phase !== "waiting" ? buildSidePots(room.players).map((p) => ({ amount: p.amount, label: p.label })) : [],
     smallBlind: room.smallBlind,
     bigBlind: room.bigBlind,
     maxPlayers: MAX_PLAYERS,
@@ -943,9 +1064,26 @@ function disconnect(client) {
     if (!stillConnected) {
       player.connected = false;
       broadcast(room, "system", { message: `${player.name} disconnected.` });
+      maybeTransferOwner(room, player);
       broadcastState(room);
     }
   }
+}
+
+// Transfer ownership to the next connected seated player when the owner leaves or disconnects.
+function maybeTransferOwner(room, leavingPlayer) {
+  if (room.ownerId !== leavingPlayer.id) return;
+  // Prefer connected players; fall back to any remaining player.
+  const connectedIds = new Set([...clients.values()]
+    .filter((c) => c.roomCode === room.code)
+    .map((c) => c.playerId));
+  const candidate =
+    room.players.find((p) => p.id !== leavingPlayer.id && p.seatNumber && connectedIds.has(p.id)) ||
+    room.players.find((p) => p.id !== leavingPlayer.id && p.seatNumber) ||
+    room.players.find((p) => p.id !== leavingPlayer.id);
+  if (!candidate) return;
+  room.ownerId = candidate.id;
+  broadcast(room, "system", { message: `${candidate.name} is now the table owner.` });
 }
 
 function getRoom(client) {
