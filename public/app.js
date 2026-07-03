@@ -595,24 +595,17 @@ function playSound(kind) {
 // ─── Voice Chat ──────────────────────────────────────────────────────────────
 //
 // Architecture: Perfect Negotiation pattern (RFC 8829 §4.1.1).
-// peers Map entries: { pc, makingOffer, ignoreOffer, iceCandidateQueue, polite }
+// peers Map entries: { pc, makingOffer, ignoreOffer, iceCandidateQueue }
 //
 // Known failure modes handled here:
-// 1. Offer collision -> polite peer rolls back; impolite peer ignores incoming offer
-// 2. ICE before SDP   -> candidates queued until remoteDescription is set
-// 3. Autoplay blocked -> explicit audio.play() with user-gesture unlock fallback
-// 4. Failed connection -> peer entry cleaned up so ensurePeer can retry
-// 5. One-sided start  -> receiving side creates peer via handleVoiceSignal
-// 6. Non-HTTPS       -> getUserMedia is blocked on non-localhost HTTP; warn clearly
+//   1. Offer collision    → polite peer rolls back; impolite peer ignores incoming offer
+//   2. ICE before SDP     → candidates queued until remoteDescription is set
+//   3. Autoplay blocked   → explicit audio.play() with user-gesture unlock fallback
+//   4. Failed connection  → peer entry cleaned up so ensurePeer can retry
+//   5. One-sided start    → receiving side creates peer via handleVoiceSignal even if
+//                           they haven't clicked "Start Voice" yet (graceful no-op)
+//   6. Non-HTTPS          → getUserMedia is blocked on non-localhost HTTP; we warn clearly
 // ─────────────────────────────────────────────────────────────────────────────
-
-function buildIceServers() {
-  return [
-    { urls: "stun:stun.l.google.com:19302" },
-    { urls: "stun:stun1.l.google.com:19302" },
-    { urls: "stun:stun.cloudflare.com:3478" },
-  ];
-}
 
 function voiceLog(msg) {
   console.log(`[Voice] ${msg}`);
@@ -620,21 +613,16 @@ function voiceLog(msg) {
 }
 
 async function startVoice() {
-  const isSecure =
-    location.protocol === "https:" ||
-    location.hostname === "localhost" ||
-    location.hostname === "127.0.0.1";
-
+  // getUserMedia requires HTTPS or localhost — warn early if neither
+  const isSecure = location.protocol === "https:" || location.hostname === "localhost" || location.hostname === "127.0.0.1";
   if (!isSecure) {
     voiceLog("Voice requires HTTPS. Ask the host to serve over HTTPS, or test on localhost.");
     return;
   }
-
   if (!navigator.mediaDevices?.getUserMedia) {
     voiceLog("This browser does not support microphone access.");
     return;
   }
-
   try {
     localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
     voiceLog("Microphone granted. Connecting to peers...");
@@ -642,13 +630,14 @@ async function startVoice() {
     voiceLog(`Microphone error: ${err.name}. Check browser permissions.`);
     return;
   }
-
   muted = false;
   muteBtn.disabled = false;
   voiceBtn.disabled = true;
   voiceBtn.textContent = "Voice On";
   send("setVoice", { muted });
 
+  // Connect to every player who is currently in the room.
+  // Both sides call ensurePeer — Perfect Negotiation handles the collision.
   state.players
     .filter((p) => p.id !== playerId && p.connected)
     .forEach((p) => ensurePeer(p.id));
@@ -656,7 +645,7 @@ async function startVoice() {
 
 function toggleMute() {
   muted = !muted;
-  localStream?.getAudioTracks().forEach((t) => (t.enabled = !muted));
+  localStream?.getAudioTracks().forEach((t) => { t.enabled = !muted; });
   muteBtn.textContent = muted ? "Unmute" : "Mute";
   send("setVoice", { muted });
 }
@@ -666,23 +655,17 @@ function renderVoicePeers() {
   state.players.filter((p) => p.id !== playerId).forEach((p) => {
     const entry = peers.get(p.id);
     const cs = entry?.pc.connectionState;
-    const label = !localStream
-      ? "—"
-      : cs === "connected"
-        ? "🟢 Live"
-        : cs === "connecting" || cs === "new"
-          ? "🟡 Connecting"
-          : cs === "failed"
-            ? "🔴 Failed"
-            : p.connected
-              ? "⚪ Waiting"
-              : "Offline";
-
+    const label = !localStream ? "—"
+      : cs === "connected" ? "🟢 Live"
+      : cs === "connecting" || cs === "new" ? "🟡 Connecting"
+      : cs === "failed" ? "🔴 Failed"
+      : p.connected ? "⚪ Waiting"
+      : "Offline";
     const row = document.createElement("div");
     row.className = "voice-peer";
     row.innerHTML = `<span>${escapeHtml(p.name)}</span><span style="font-size:0.78rem">${label}</span>`;
     voicePeers.appendChild(row);
-
+    // Retry any peer that failed
     if (localStream && p.connected) {
       if (entry?.pc.connectionState === "failed") {
         voiceLog(`Retrying connection to ${p.name}…`);
@@ -694,39 +677,84 @@ function renderVoicePeers() {
   });
 }
 
-function ensurePeer(targetId) {
-  if (peers.has(targetId)) return peers.get(targetId);
-  if (!localStream) return null;
+function buildIceServers() {
+  return [
+    { urls: "stun:stun.l.google.com:19302" },
+    { urls: "stun:stun1.l.google.com:19302" },
+    { urls: "stun:stun.cloudflare.com:3478" },
+    {
+      urls: [
+        "turn:openrelay.metered.ca:80",
+        "turn:openrelay.metered.ca:443",
+        "turn:openrelay.metered.ca:443?transport=tcp",
+        "turns:openrelay.metered.ca:443"
+      ],
+      username: "openrelayproject",
+      credential: "openrelayproject"
+    },
+    {
+      urls: [
+        "turn:numb.viagenie.ca:3478",
+        "turn:numb.viagenie.ca:3478?transport=tcp"
+      ],
+      username: "webrtc@live.com",
+      credential: "muazkh"
+    }
+  ];
+}
 
+// Run window.voiceDiag() in DevTools console after starting voice.
+// Shows candidate types: host=local LAN, srflx=STUN public IP, relay=TURN relay.
+// If you ONLY see host candidates, STUN/TURN are blocked by your network.
+window.voiceDiag = function() {
+  if (!peers.size) { console.log("No peers open yet — start voice first."); return; }
+  peers.forEach((peer, id) => {
+    const pc = peer.pc;
+    console.group("Peer " + id);
+    console.log("connectionState:", pc.connectionState);
+    console.log("iceConnectionState:", pc.iceConnectionState);
+    console.log("iceGatheringState:", pc.iceGatheringState);
+    pc.getStats().then((stats) => {
+      stats.forEach((r) => {
+        if (r.type === "local-candidate")
+          console.log("  local candidate:", r.candidateType, r.protocol, r.address + ":" + r.port);
+        if (r.type === "candidate-pair" && r.nominated)
+          console.log("  NOMINATED PAIR state=" + r.state, "bytesSent=" + r.bytesSent);
+      });
+    });
+    console.groupEnd();
+  });
+};
+
+
+function ensurePeer(targetId) {
+  if (peers.has(targetId) || !localStream) return peers.get(targetId);
+
+  // Polite peer = lexicographically smaller playerId.
+  // The polite peer rolls back its offer when a collision occurs.
   const polite = playerId < targetId;
   voiceLog(`Opening peer connection to ${targetId} (${polite ? "polite" : "impolite"})`);
 
-  const pc = new RTCPeerConnection({ iceServers: buildIceServers() });
-  const peer = {
-    pc,
-    makingOffer: false,
-    ignoreOffer: false,
-    iceCandidateQueue: [],
-    polite,
-  };
+  const pc = new RTCPeerConnection({
+    iceServers: buildIceServers()
+  });
 
+  const peer = { pc, makingOffer: false, ignoreOffer: false, iceCandidateQueue: [] };
   peers.set(targetId, peer);
 
+  // Add local tracks — this triggers onnegotiationneeded on both sides
   localStream.getTracks().forEach((track) => pc.addTrack(track, localStream));
 
   pc.onnegotiationneeded = async () => {
+    voiceLog(`Negotiation needed with ${targetId}, signalingState=${pc.signalingState}`);
     try {
-      if (pc.signalingState !== "stable") return;
       peer.makingOffer = true;
-      voiceLog(`Negotiation needed with ${targetId}, signalingState=${pc.signalingState}`);
+      // setLocalDescription() with no args: browser auto-creates the right offer/answer type
       await pc.setLocalDescription();
-      voiceLog(`Sending offer to ${targetId}`);
-      send("voiceSignal", {
-        targetId,
-        signal: { description: pc.localDescription },
-      });
+      voiceLog(`Sending ${pc.localDescription.type} to ${targetId}`);
+      send("voiceSignal", { targetId, signal: { description: pc.localDescription } });
     } catch (err) {
-      console.error("[Voice] onnegotiationneeded error", err);
+      console.error("[Voice] onnegotiationneeded error:", err);
     } finally {
       peer.makingOffer = false;
     }
@@ -734,11 +762,9 @@ function ensurePeer(targetId) {
 
   pc.onicecandidate = ({ candidate }) => {
     if (candidate) {
-      voiceLog(`ICE candidate ${candidate.type || ""} for ${targetId}`);
-      send("voiceSignal", {
-        targetId,
-        signal: { candidate },
-      });
+      // Log candidate type: host=local, srflx=STUN, relay=TURN
+      voiceLog(`ICE candidate [${candidate.type}] for ${targetId}`);
+      send("voiceSignal", { targetId, signal: { candidate } });
     } else {
       voiceLog(`ICE gathering complete for ${targetId}`);
     }
@@ -748,10 +774,14 @@ function ensurePeer(targetId) {
     voiceLog(`ICE gathering: ${pc.iceGatheringState} (peer: ${targetId})`);
   };
 
+  pc.oniceconnectionstatechange = () => {
+    voiceLog(`ICE connection: ${pc.iceConnectionState} (peer: ${targetId})`);
+  };
+
   pc.onconnectionstatechange = () => {
-    voiceLog(`Connection state ${pc.connectionState} peer ${targetId}`);
+    voiceLog(`Connection state: ${pc.connectionState} (peer: ${targetId})`);
     if (pc.connectionState === "connected") {
-      voiceLog(`Audio connected with ${targetId}`);
+      voiceLog(`✅ Audio connected with ${targetId}`);
     }
     if (pc.connectionState === "failed" || pc.connectionState === "closed") {
       peers.delete(targetId);
@@ -760,18 +790,20 @@ function ensurePeer(targetId) {
   };
 
   pc.ontrack = ({ streams }) => {
+    voiceLog(`Track received from ${targetId}`);
+    const stream = streams[0];
     let audio = document.querySelector(`[data-audio="${targetId}"]`);
     if (!audio) {
       audio = document.createElement("audio");
-      audio.autoplay = true;
       audio.dataset.audio = targetId;
       audioMount.appendChild(audio);
     }
-    audio.srcObject = streams[0];
+    audio.srcObject = stream;
+    // autoplay is often blocked by browser policy — force play() with a catch
     audio.play().catch(() => {
-      voiceLog("Autoplay blocked, click anywhere on the page to hear audio.");
-      const unlock = () => audio.play().catch(() => {});
-      document.removeEventListener("click", unlock);
+      // If autoplay is blocked, unlock on next user gesture anywhere on the page
+      voiceLog("Autoplay blocked — click anywhere on the page to hear audio.");
+      const unlock = () => { audio.play().catch(() => {}); document.removeEventListener("click", unlock); };
       document.addEventListener("click", unlock, { once: true });
     });
   };
@@ -782,15 +814,17 @@ function ensurePeer(targetId) {
 async function handleVoiceSignal(payload) {
   const { fromId, signal } = payload;
 
+  // If we have a local stream, ensure a peer exists.
+  // If we don't yet (other player started voice first), we can still accept
+  // the offer once our own stream is ready — but for now, just log and drop.
   if (!localStream) {
-    voiceLog(`Signal from ${fromId} received but voice not started yet.`);
+    voiceLog(`Signal from ${fromId} received but voice not started yet — click Start Voice.`);
     return;
   }
 
   const peer = ensurePeer(fromId);
   if (!peer) return;
-
-  const pc = peer.pc;
+  const { pc } = peer;
   const polite = playerId < fromId;
 
   try {
@@ -802,73 +836,116 @@ async function handleVoiceSignal(payload) {
         (peer.makingOffer || pc.signalingState !== "stable");
 
       peer.ignoreOffer = !polite && offerCollision;
-
       if (peer.ignoreOffer) {
         voiceLog(`Collision — impolite peer ignoring offer from ${fromId}`);
         return;
       }
 
+      // Polite peer: roll back our pending offer so we can accept theirs
       if (offerCollision) {
-        voiceLog(`Collision — polite peer rolling back offer to accept ${fromId}`);
+        voiceLog(`Collision — polite peer rolling back offer to accept ${fromId}'s`);
         await pc.setLocalDescription({ type: "rollback" });
       }
 
       await pc.setRemoteDescription(signal.description);
 
+      // Flush ICE candidates that arrived before remoteDescription was set
       for (const c of peer.iceCandidateQueue) {
-        await pc.addIceCandidate(c).catch((e) => console.warn("[Voice] Queued ICE error", e));
+        await pc.addIceCandidate(c).catch((e) => console.warn("[Voice] Queued ICE error:", e));
       }
       peer.iceCandidateQueue = [];
 
       if (signal.description.type === "offer") {
         await pc.setLocalDescription();
         voiceLog(`Sending answer to ${fromId}`);
-        send("voiceSignal", {
-          targetId: fromId,
-          signal: { description: pc.localDescription },
-        });
+        send("voiceSignal", { targetId: fromId, signal: { description: pc.localDescription } });
       }
     }
 
     if (signal.candidate) {
       if (pc.remoteDescription?.type) {
-        await pc.addIceCandidate(signal.candidate).catch((e) => {
-          console.warn("[Voice] ICE candidate error", e);
-        });
+        await pc.addIceCandidate(signal.candidate)
+          .catch((e) => { if (!peer.ignoreOffer) console.warn("[Voice] ICE candidate error:", e); });
       } else {
+        // Queue — remote description hasn't arrived yet
         peer.iceCandidateQueue.push(signal.candidate);
       }
     }
   } catch (err) {
-    if (!peer.ignoreOffer) {
-      console.error("[Voice] handleVoiceSignal error", err);
-    }
+    if (!peer.ignoreOffer) console.error("[Voice] handleVoiceSignal error:", err);
   }
 }
 
-window.voiceDiag = () => {
-  if (!peers.size) {
-    console.log("No peers open yet. Start voice first.");
+function copyRoomCode() {
+  navigator.clipboard?.writeText(roomCode);
+  addMessage("Table", `Room code copied: ${roomCode}`);
+}
+
+function getLastRoom() {
+  return (localStorage.getItem("pokerLastRoom") || "").trim().toUpperCase();
+}
+
+function setLastRoom(code) {
+  if (code) localStorage.setItem("pokerLastRoom", String(code).trim().toUpperCase());
+}
+
+function clearLastRoom() {
+  localStorage.removeItem("pokerLastRoom");
+}
+
+function tryAutoReconnect() {
+  if (sessionStorage.getItem("pokerAutoRejoin") !== "1") return;
+  if (socket) return;
+  const code = getLastRoom();
+  const name = (localStorage.getItem("pokerName") || "").trim();
+  const savedSeat = code ? readSavedSeat(code) : null;
+  if (!code || !name || !savedSeat?.token || savedSeat?.name !== name) {
+    sessionStorage.removeItem("pokerAutoRejoin");
     return;
   }
+  reconnectAttempted = true;
+  roomInput.value = code;
+  connect("joinRoom");
+}
 
-  peers.forEach((peer, id) => {
-    const pc = peer.pc;
-    console.group(`Peer ${id}`);
-    console.log("signalingState", pc.signalingState);
-    console.log("connectionState", pc.connectionState);
-    console.log("iceConnectionState", pc.iceConnectionState);
-    console.log("iceGatheringState", pc.iceGatheringState);
-    pc.getStats().then((stats) => {
-      stats.forEach((r) => {
-        if (r.type === "local-candidate") {
-          console.log("local candidate", r.candidateType, r.protocol, r.address, r.port);
-        }
-        if (r.type === "candidate-pair" && r.nominated) {
-          console.log("NOMINATED PAIR", r.state, r.bytesSent, r.bytesReceived);
-        }
-      });
-      console.groupEnd();
-    });
-  });
-};
+window.addEventListener("beforeunload", () => {
+  if (roomCode) sessionStorage.setItem("pokerAutoRejoin", "1");
+});
+
+window.addEventListener("load", () => {
+  tryAutoReconnect();
+});
+
+function readSavedSeat(code) {
+  try {
+    return JSON.parse(localStorage.getItem(`pokerSeat:${code}`) || "null");
+  } catch {
+    return null;
+  }
+}
+
+function saveSeat(code, name, token) {
+  localStorage.setItem(`pokerSeat:${code}`, JSON.stringify({ name, token }));
+}
+
+function suitSymbol(suit) {
+  return { S: "\u2660", H: "\u2665", D: "\u2666", C: "\u2663" }[suit] || suit;
+}
+
+function isRed(card) {
+  return card.suit === "H" || card.suit === "D";
+}
+
+function titleCase(text) {
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
+function escapeHtml(text) {
+  return String(text).replace(/[&<>"']/g, (char) => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#039;"
+  }[char]));
+}
