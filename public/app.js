@@ -15,6 +15,9 @@ const soundBtn = document.querySelector("#soundBtn");
 const awayBtn = document.querySelector("#awayBtn");
 const pauseBtn = document.querySelector("#pauseBtn");
 const showCardsBtn = document.querySelector("#showCardsBtn");
+const muckCardsBtn = document.querySelector("#muckCardsBtn");
+const winnerBanner = document.querySelector("#winnerBanner");
+const handHintBanner = document.querySelector("#handHintBanner");
 const startHandBtn = document.querySelector("#startHandBtn");
 const menuBtn = document.querySelector("#menuBtn");
 const optionsMenu = document.querySelector("#optionsMenu");
@@ -47,6 +50,7 @@ let playerId;
 let roomCode;
 let timerInterval;
 let localStream;
+let reconnectAttempted = false;
 let muted = false;
 let away = false;
 let soundEnabled = localStorage.getItem("pokerSound") !== "off";
@@ -54,16 +58,16 @@ let audioContext;
 const peers = new Map();
 
 const seatPositions = [
-  ["50.0%", "90.0%"],
-  ["24.1%", "82.4%"],
-  ["8.2%", "62.4%"],
-  ["8.2%", "37.6%"],
-  ["24.1%", "17.6%"],
-  ["50.0%", "10.0%"],
-  ["75.9%", "17.6%"],
-  ["91.8%", "37.6%"],
-  ["91.8%", "62.4%"],
-  ["75.9%", "82.4%"]
+  ["50%", "97%"],
+  ["21%", "89%"],
+  ["4%", "67%"],
+  ["4%", "35%"],
+  ["21%", "10%"],
+  ["50%", "3%"],
+  ["79%", "10%"],
+  ["96%", "35%"],
+  ["96%", "67%"],
+  ["79%", "89%"]
 ];
 
 nameInput.value = localStorage.getItem("pokerName") || "";
@@ -78,6 +82,7 @@ soundBtn.addEventListener("click", toggleSound);
 awayBtn.addEventListener("click", toggleAway);
 pauseBtn.addEventListener("click", togglePause);
 showCardsBtn.addEventListener("click", () => send("showCards"));
+muckCardsBtn.addEventListener("click", () => send("muckCards"));
 leaveSeatBtn.addEventListener("click", () => {
   send("leaveSeat");
   optionsMenu.classList.add("hidden");
@@ -110,14 +115,7 @@ chatForm.addEventListener("submit", (event) => {
 
 chipsForm.addEventListener("submit", (event) => {
   event.preventDefault();
-  const input = window.prompt("How many chips do you need?", chipsInput.value || "1000");
-  if (input === null) return;
-  const amount = Number(input);
-  if (!amount || amount <= 0) {
-    notice.textContent = "Enter a valid chip amount.";
-    return;
-  }
-  send("requestChips", { amount });
+  send("requestChips", { amount: Number(chipsInput.value) });
   playSound("chips");
 });
 
@@ -140,8 +138,8 @@ function connect(type) {
   socket = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}`);
 
   socket.addEventListener("open", () => {
-    const code = roomInput.value.trim().toUpperCase();
-    const savedSeat = readSavedSeat(code);
+    const code = type === "createRoom" ? "" : roomInput.value.trim().toUpperCase();
+    const savedSeat = code ? readSavedSeat(code) : null;
     const token = type === "joinRoom" && savedSeat?.name === name ? savedSeat.token : "";
     send(type, { name, code, token, buyIn: Number(buyInInput.value), seatNumber: Number(seatInput.value) });
   });
@@ -152,21 +150,35 @@ function connect(type) {
       playerId = message.payload.playerId;
       roomCode = message.payload.roomCode;
       saveSeat(roomCode, nameInput.value.trim() || "Player", message.payload.token);
+      setLastRoom(roomCode);
+      sessionStorage.setItem("pokerAutoRejoin", "1");
+      reconnectAttempted = false;
       joinPanel.classList.add("hidden");
       tableScreen.classList.remove("hidden");
       copyCodeBtn.textContent = roomCode;
+      notice.textContent = "";
     }
     if (message.type === "state") render(message.payload);
     if (message.type === "chat") addMessage(message.payload.name, message.payload.text);
     if (message.type === "system") addMessage("Table", message.payload.message);
-    if (message.type === "error") notice.textContent = message.payload.message;
+    if (message.type === "error") {
+      notice.textContent = message.payload.message;
+      if (reconnectAttempted) {
+        reconnectAttempted = false;
+        sessionStorage.removeItem("pokerAutoRejoin");
+        if (message.payload.message === "Room not found.") {
+          clearLastRoom();
+          roomInput.value = "";
+        }
+      }
+    }
     if (message.type === "voiceSignal") handleVoiceSignal(message.payload);
   });
 
   socket.addEventListener("close", () => {
     createBtn.disabled = false;
     joinBtn.disabled = false;
-    addMessage("Table", "Connection closed. Refresh to rejoin.");
+    addMessage("Table", "Connection closed.");
   });
 
   socket.addEventListener("error", () => {
@@ -197,7 +209,39 @@ function render(nextState) {
   renderStats();
   renderLedger();
   renderRejoinBar();
+  renderWinnerBanner(previous);
+  renderHandHint();
   reactToStateChange(previous, state);
+}
+
+let winnerBannerTimeout = null;
+
+function renderWinnerBanner(previous) {
+  if (!winnerBanner) return;
+  const isNewWin = state.lastWin && (!previous?.lastWin || previous.lastWin.at !== state.lastWin.at);
+  if (isNewWin) {
+    const win = state.lastWin;
+    const names = win.winners.map((entry) => entry.name).join(", ");
+    const handText = win.handName ? ` with ${titleCase(win.handName)}` : "";
+    winnerBanner.textContent = win.winners.length > 1
+      ? `${names} split the pot (${win.amount} each)${handText}`
+      : `${names} wins ${win.amount}${handText}`;
+    winnerBanner.classList.remove("hidden");
+    clearTimeout(winnerBannerTimeout);
+    winnerBannerTimeout = setTimeout(() => winnerBanner.classList.add("hidden"), 5000);
+  }
+  if (state.phase !== "showdown" && !state.lastWin) winnerBanner.classList.add("hidden");
+}
+
+function renderHandHint() {
+  if (!handHintBanner) return;
+  const me = state.players.find((player) => player.id === playerId);
+  if (me && me.handHint) {
+    handHintBanner.textContent = me.handHint;
+    handHintBanner.classList.remove("hidden");
+  } else {
+    handHintBanner.classList.add("hidden");
+  }
 }
 
 function renderSeats() {
@@ -206,7 +250,7 @@ function renderSeats() {
     const player = state.players.find((item) => item.seatNumber === seatNumber);
     const seat = document.createElement("article");
     seat.className = player
-      ? `seat ${player.isTurn ? "turn" : ""} ${player.id === playerId ? "me" : ""} ${player.sittingOut ? "away" : ""}`
+      ? `seat ${player.isTurn ? "turn" : ""} ${player.id === playerId ? "me" : ""} ${player.sittingOut ? "away" : ""} ${player.wonHand ? "winner" : ""}`
       : "seat seat-empty";
     const position = seatPosition(seatNumber);
     seat.style.left = position[0];
@@ -214,7 +258,7 @@ function renderSeats() {
     seat.style.transform = "translate(-50%, -50%)";
 
     if (!player) {
-      seat.innerHTML = `<div class="seat-number">${seatNumber}</div><span>Open</span>`;
+      seat.innerHTML = `<div class="seat-number">${seatNumber}</div><span class="seat-sit">Sit</span>`;
       seats.appendChild(seat);
       continue;
     }
@@ -222,13 +266,18 @@ function renderSeats() {
     const status = player.sittingOut ? "Away" : player.stack === 0 ? "Broke" : player.folded ? "Folded" : player.allIn ? "All-in" : !player.connected ? "Offline" : "";
     const statusBadge = status ? `<span class="badge ${status === "Folded" || status === "Broke" ? "warn" : ""}">${status}</span>` : "";
     const betBadge = player.bet ? `<span class="badge bet">${player.bet}</span>` : "";
+    const winBadge = player.wonHand ? '<span class="badge win">Winner</span>' : "";
+    const hintBadge = player.id === playerId && player.handHint ? `<span class="badge hint">${escapeHtml(player.handHint)}</span>` : "";
     seat.innerHTML = `
-      <div class="seat-name">
-        <span>${escapeHtml(player.name)}${player.isOwner ? " *" : ""}</span>
-        ${player.dealer ? '<span class="dealer">D</span>' : ""}
-      </div>
       <div class="cards seat-cards"></div>
-      <div class="seat-meta"><span class="stack">${player.stack}</span>${statusBadge || betBadge}</div>
+      <div class="seat-pod">
+        <div class="seat-avatar">${initials(player.name)}${player.dealer ? '<span class="dealer">D</span>' : ""}</div>
+        <div class="seat-info">
+          <span class="seat-name">${escapeHtml(player.name)}${player.isOwner ? " *" : ""}</span>
+          <span class="seat-stack">${player.stack}</span>
+          ${winBadge || hintBadge || statusBadge || betBadge}
+        </div>
+      </div>
     `;
     renderCards(seat.querySelector(".seat-cards"), player.cards);
     seats.appendChild(seat);
@@ -266,15 +315,16 @@ function renderControls() {
   const current = state.players[state.turnIndex];
   const myTurn = current?.id === playerId;
   const pausedText = state.paused ? "Paused by owner" : "";
-  turnLabel.textContent = pausedText || (current ? `${current.name}'s turn` : state.phase === "waiting" ? "Waiting for players" : "Hand complete");
+  const autoStartText = state.phase === "showdown" && state.autoStartDeadline ? "Next hand starting..." : "Hand complete";
+  turnLabel.textContent = pausedText || (current ? `${current.name}'s turn` : state.phase === "waiting" ? "Waiting for players" : autoStartText);
   startHandBtn.disabled = state.paused;
   pauseBtn.classList.toggle("hidden", state.ownerId !== playerId);
   pauseBtn.textContent = state.paused ? "Resume" : "Pause";
   awayBtn.textContent = me?.sittingOut ? "Back" : "Away";
   awayBtn.disabled = !me || !me.seatNumber;
-  const canShowCards = state.phase === "showdown" && me?.cards?.some(Boolean);
-  const alreadyShowing = me?.showingCards;
-  showCardsBtn.classList.toggle("hidden", !canShowCards || alreadyShowing);
+  const canDecideCards = state.phase === "showdown" && me?.cards?.some(Boolean) && !me?.cardsDecided;
+  showCardsBtn.classList.toggle("hidden", !canDecideCards);
+  muckCardsBtn.classList.toggle("hidden", !canDecideCards);
   document.querySelectorAll("[data-action]").forEach((button) => {
     button.disabled = state.paused || me?.sittingOut || !myTurn || state.phase === "waiting" || state.phase === "showdown";
   });
@@ -288,11 +338,12 @@ function renderControls() {
 
   clearInterval(timerInterval);
   timerInterval = setInterval(() => {
-    if (!state.turnDeadline) {
+    const deadline = state.turnDeadline || state.autoStartDeadline;
+    if (!deadline) {
       timerLabel.textContent = "--";
       return;
     }
-    const left = Math.max(0, Math.ceil((state.turnDeadline - Date.now()) / 1000));
+    const left = Math.max(0, Math.ceil((deadline - Date.now()) / 1000));
     timerLabel.textContent = `${left}s`;
   }, 250);
 }
@@ -339,7 +390,6 @@ function renderStats() {
       <span>Wins ${stats.wins || 0}</span>
       <span>Buy-in ${stats.buyIns || 0}</span>
       <span>Won ${stats.chipsWon || 0}</span>
-      <span>Rebuys ${stats.rebuys || 0}</span>
     `;
     statsPanel.appendChild(row);
   });
@@ -413,6 +463,10 @@ function toggleAway() {
 
 function togglePause() {
   send("pauseGame", { paused: !state.paused });
+}
+
+function initials(name) {
+  return String(name).trim().split(/\s+/).slice(0, 2).map((w) => w[0]?.toUpperCase() || "").join("") || "?";
 }
 
 function rankLabel(rank) {
@@ -531,6 +585,41 @@ function copyRoomCode() {
   navigator.clipboard?.writeText(roomCode);
   addMessage("Table", `Room code copied: ${roomCode}`);
 }
+
+function getLastRoom() {
+  return (localStorage.getItem("pokerLastRoom") || "").trim().toUpperCase();
+}
+
+function setLastRoom(code) {
+  if (code) localStorage.setItem("pokerLastRoom", String(code).trim().toUpperCase());
+}
+
+function clearLastRoom() {
+  localStorage.removeItem("pokerLastRoom");
+}
+
+function tryAutoReconnect() {
+  if (sessionStorage.getItem("pokerAutoRejoin") !== "1") return;
+  if (socket) return;
+  const code = getLastRoom();
+  const name = (localStorage.getItem("pokerName") || "").trim();
+  const savedSeat = code ? readSavedSeat(code) : null;
+  if (!code || !name || !savedSeat?.token || savedSeat?.name !== name) {
+    sessionStorage.removeItem("pokerAutoRejoin");
+    return;
+  }
+  reconnectAttempted = true;
+  roomInput.value = code;
+  connect("joinRoom");
+}
+
+window.addEventListener("beforeunload", () => {
+  if (roomCode) sessionStorage.setItem("pokerAutoRejoin", "1");
+});
+
+window.addEventListener("load", () => {
+  tryAutoReconnect();
+});
 
 function readSavedSeat(code) {
   try {
