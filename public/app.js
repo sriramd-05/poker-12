@@ -199,7 +199,13 @@ function render(nextState) {
   state = nextState;
   phaseLabel.textContent = titleCase(state.phase);
   potLabel.textContent = `Total Pot ${state.pot}`;
-  roundPotLabel.textContent = `Current Round ${state.roundPot || 0}`;
+  // Show individual side pot breakdown when more than one pot exists (i.e. someone is all-in).
+  const sidePots = state.sidePots || [];
+  if (sidePots.length > 1) {
+    roundPotLabel.textContent = sidePots.map((p) => `${p.label}: ${p.amount}`).join(" · ");
+  } else {
+    roundPotLabel.textContent = `Current Round ${state.roundPot || 0}`;
+  }
   renderBoard();
   renderSeats();
   renderControls();
@@ -591,23 +597,26 @@ async function startVoice() {
     addMessage("Voice", "This browser does not support microphone capture.");
     return;
   }
-  localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+  try {
+    localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+  } catch {
+    addMessage("Voice", "Microphone permission denied.");
+    return;
+  }
   muted = false;
   muteBtn.disabled = false;
   voiceBtn.disabled = true;
   voiceBtn.textContent = "Voice On";
   send("setVoice", { muted });
-
+  // Kick off connections to all currently-present players.
   state.players
-    .filter((player) => player.id !== playerId)
-    .forEach((player) => ensurePeer(player.id, true));
+    .filter((player) => player.id !== playerId && player.connected)
+    .forEach((player) => ensurePeer(player.id));
 }
 
 function toggleMute() {
   muted = !muted;
-  localStream?.getAudioTracks().forEach((track) => {
-    track.enabled = !muted;
-  });
+  localStream?.getAudioTracks().forEach((track) => { track.enabled = !muted; });
   muteBtn.textContent = muted ? "Unmute" : "Mute";
   send("setVoice", { muted });
 }
@@ -617,27 +626,64 @@ function renderVoicePeers() {
   state.players.filter((player) => player.id !== playerId).forEach((player) => {
     const row = document.createElement("div");
     row.className = "voice-peer";
-    row.innerHTML = `<span>${escapeHtml(player.name)}</span><span>${player.connected ? "Ready" : "Offline"}</span>`;
+    const peerState = peers.get(player.id);
+    const connLabel = !localStream ? "—" : peerState?.pc.connectionState === "connected" ? "Live" : player.connected ? "Connecting" : "Offline";
+    row.innerHTML = `<span>${escapeHtml(player.name)}</span><span>${connLabel}</span>`;
     voicePeers.appendChild(row);
-    if (localStream && player.connected) ensurePeer(player.id, true);
+    // Open a connection to any connected player we don't have one for yet.
+    if (localStream && player.connected) ensurePeer(player.id);
   });
 }
 
-function ensurePeer(targetId, polite) {
+// Each entry in `peers` is { pc, makingOffer, ignoreOffer, iceCandidateQueue }.
+// We use the Perfect Negotiation pattern so both sides can call ensurePeer independently
+// without worrying about offer collisions.
+function ensurePeer(targetId) {
   if (peers.has(targetId) || !localStream) return peers.get(targetId);
+
+  // Polite peer = the one with the lexicographically smaller ID.
+  // The polite peer backs off and accepts the remote offer on collision.
+  const polite = playerId < targetId;
+
   const pc = new RTCPeerConnection({
-    iceServers: [{ urls: "stun:stun.l.google.com:19302" }]
+    iceServers: [
+      { urls: "stun:stun.l.google.com:19302" },
+      { urls: "stun:stun1.l.google.com:19302" }
+    ]
   });
-  peers.set(targetId, pc);
+
+  const peer = { pc, makingOffer: false, ignoreOffer: false, iceCandidateQueue: [] };
+  peers.set(targetId, peer);
+
   localStream.getTracks().forEach((track) => pc.addTrack(track, localStream));
 
-  pc.addEventListener("icecandidate", (event) => {
-    if (event.candidate) {
-      send("voiceSignal", { targetId, signal: { candidate: event.candidate } });
+  // onnegotiationneeded fires when tracks are added — this starts the offer/answer dance.
+  pc.onnegotiationneeded = async () => {
+    try {
+      peer.makingOffer = true;
+      await pc.setLocalDescription(); // browser creates offer/answer automatically
+      send("voiceSignal", { targetId, signal: { description: pc.localDescription } });
+    } catch (err) {
+      console.error("Voice negotiation error:", err);
+    } finally {
+      peer.makingOffer = false;
     }
-  });
+  };
 
-  pc.addEventListener("track", (event) => {
+  pc.onicecandidate = ({ candidate }) => {
+    if (candidate) send("voiceSignal", { targetId, signal: { candidate } });
+  };
+
+  pc.onconnectionstatechange = () => {
+    // Clean up peer entries that have permanently failed so they can be retried.
+    if (pc.connectionState === "failed" || pc.connectionState === "closed") {
+      peers.delete(targetId);
+      const audio = document.querySelector(`[data-audio="${targetId}"]`);
+      audio?.remove();
+    }
+  };
+
+  pc.ontrack = ({ streams }) => {
     let audio = document.querySelector(`[data-audio="${targetId}"]`);
     if (!audio) {
       audio = document.createElement("audio");
@@ -645,30 +691,54 @@ function ensurePeer(targetId, polite) {
       audio.dataset.audio = targetId;
       audioMount.appendChild(audio);
     }
-    audio.srcObject = event.streams[0];
-  });
+    audio.srcObject = streams[0];
+  };
 
-  if (polite && playerId < targetId) {
-    pc.createOffer()
-      .then((offer) => pc.setLocalDescription(offer))
-      .then(() => send("voiceSignal", { targetId, signal: { description: pc.localDescription } }));
-  }
-  return pc;
+  return peer;
 }
 
 async function handleVoiceSignal(payload) {
   if (!localStream) return;
-  const pc = ensurePeer(payload.fromId, false);
-  const { signal } = payload;
-  if (signal.description) {
-    await pc.setRemoteDescription(signal.description);
-    if (signal.description.type === "offer") {
-      const answer = await pc.createAnswer();
-      await pc.setLocalDescription(answer);
-      send("voiceSignal", { targetId: payload.fromId, signal: { description: pc.localDescription } });
+  const { fromId, signal } = payload;
+  const peer = ensurePeer(fromId);
+  if (!peer) return;
+  const { pc } = peer;
+  const polite = playerId < fromId;
+
+  try {
+    if (signal.description) {
+      // Collision: we're making an offer AND we just received one.
+      const offerCollision = signal.description.type === "offer" &&
+        (peer.makingOffer || pc.signalingState !== "stable");
+
+      peer.ignoreOffer = !polite && offerCollision;
+      if (peer.ignoreOffer) return; // impolite peer drops its own offer
+
+      await pc.setRemoteDescription(signal.description);
+
+      // Flush any ICE candidates that arrived before the remote description was ready.
+      for (const candidate of peer.iceCandidateQueue) {
+        await pc.addIceCandidate(candidate);
+      }
+      peer.iceCandidateQueue = [];
+
+      if (signal.description.type === "offer") {
+        await pc.setLocalDescription(); // browser auto-creates the answer
+        send("voiceSignal", { targetId: fromId, signal: { description: pc.localDescription } });
+      }
     }
+
+    if (signal.candidate) {
+      if (pc.remoteDescription && pc.remoteDescription.type) {
+        await pc.addIceCandidate(signal.candidate);
+      } else {
+        // Remote description not set yet — queue the candidate.
+        peer.iceCandidateQueue.push(signal.candidate);
+      }
+    }
+  } catch (err) {
+    if (!peer.ignoreOffer) console.error("Voice signal error:", err);
   }
-  if (signal.candidate) await pc.addIceCandidate(signal.candidate);
 }
 
 function copyRoomCode() {
