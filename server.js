@@ -154,7 +154,6 @@ function handleMessage(client, message) {
   if (type === "setAway") setAway(client, payload);
   if (type === "pauseGame") pauseGame(client, payload);
   if (type === "showCards") showCards(client);
-  if (type === "muckCards") muckCards(client);
   if (type === "leaveSeat") leaveSeat(client);
   if (type === "rejoinSeat") rejoinSeat(client, payload);
 }
@@ -241,8 +240,6 @@ function startHandForClient(client) {
     broadcast(room, "system", { message: "Need at least two players with chips to start." });
     return;
   }
-  if (room.autoStartTimer) { clearTimeout(room.autoStartTimer); room.autoStartTimer = null; }
-  room.autoStartDeadline = null;
   startHand(room);
 }
 
@@ -359,7 +356,8 @@ function approveChips(client, payload) {
   player.stats.rebuys += 1;
   player.stats.chipsAdded += amount;
   room.chipRequests = room.chipRequests.filter((item) => item.id !== request.id);
-  room.log.unshift(`${owner.name} added ${amount} chips to ${player.name}.`);
+  room.log.unshift(`${owner.name} added ${amount} chips to ${player.name} (rebuy #${player.stats.rebuys}).`);
+  addLedger(room, "rebuy", player, `${player.name} took a rebuy of ${amount} chips — total rebuys: ${player.stats.rebuys}.`);
   broadcast(room, "system", { message: `${owner.name} added ${amount} chips to ${player.name}.` });
   broadcastState(room);
 }
@@ -391,18 +389,11 @@ function pauseGame(client, payload) {
   room.log.unshift(`${player.name} ${room.paused ? "paused" : "resumed"} the game.`);
   if (room.paused) {
     clearTurnTimer(room);
-    if (room.autoStartTimer) { clearTimeout(room.autoStartTimer); room.autoStartTimer = null; }
-    room.autoStartDeadline = null;
     broadcastState(room);
     return;
   }
   if (room.phase !== "waiting" && room.phase !== "showdown" && room.turnIndex !== -1) {
     beginTurn(room);
-    return;
-  }
-  if (room.phase === "showdown") {
-    const seated = room.players.filter((p) => p.seatNumber && p.stack > 0 && !p.sittingOut);
-    if (seated.length >= 2) scheduleAutoStart(room);
     return;
   }
   broadcastState(room);
@@ -504,18 +495,12 @@ function makeRoom() {
     phase: "waiting",
     log: ["Create a private table, invite friends, and start a hand."],
     timer: null,
-    turnDeadline: null,
-    lastWin: null,
-    autoStartTimer: null,
-    autoStartDeadline: null
+    turnDeadline: null
   };
 }
 
 function startHand(room) {
   clearTurnTimer(room);
-  if (room.autoStartTimer) { clearTimeout(room.autoStartTimer); room.autoStartTimer = null; }
-  room.autoStartDeadline = null;
-  room.lastWin = null;
   room.deck = shuffledDeck();
   room.board = [];
   room.pot = 0;
@@ -530,8 +515,6 @@ function startHand(room) {
     player.allIn = false;
     player.acted = false;
     player.showCards = false;
-    player.cardsDecided = false;
-    player.wonHand = false;
     if (player.hand.length) player.stats.hands += 1;
   });
 
@@ -626,73 +609,43 @@ function showdown(room) {
   const best = ranked[0];
   const winners = ranked.filter((entry) => compareScores(entry.score, best.score) === 0);
   const share = Math.floor(room.pot / winners.length);
-  room.players.forEach((player) => { player.cardsDecided = false; });
   winners.forEach((entry) => {
     entry.player.stack += share;
     entry.player.showCards = true;
-    entry.player.cardsDecided = true;
-    entry.player.wonHand = true;
     entry.player.stats.wins += 1;
     entry.player.stats.chipsWon += share;
     entry.player.stats.biggestPot = Math.max(entry.player.stats.biggestPot, share);
   });
-  const winnerIds = new Set(winners.map((entry) => entry.player.id));
-  contenders.forEach((player) => { if (!winnerIds.has(player.id)) player.wonHand = false; });
   room.log.unshift(`${winners.map((entry) => entry.player.name).join(", ")} win ${share} with ${best.score.name}.`);
-  room.lastWin = {
-    winners: winners.map((entry) => ({ name: entry.player.name, amount: share })),
-    handName: best.score.name,
-    amount: share,
-    at: Date.now()
-  };
   room.pot = 0;
   room.phase = "showdown";
   room.turnIndex = -1;
   broadcastState(room);
-  scheduleAutoStart(room);
 }
-
 
 function awardPot(room, player, message) {
   clearTurnTimer(room);
   const won = room.pot;
-  player.stack += won;
-  player.cardsDecided = false;
-  player.wonHand = true;
+  player.stack += room.pot;
+  player.showCards = true;
   player.stats.wins += 1;
   player.stats.chipsWon += won;
   player.stats.biggestPot = Math.max(player.stats.biggestPot, won);
-  room.players.forEach((p) => { if (p.id !== player.id) p.wonHand = false; });
   room.pot = 0;
   room.phase = "showdown";
   room.turnIndex = -1;
   room.log.unshift(message);
-  room.lastWin = { winners: [{ name: player.name, amount: won }], handName: null, amount: won, at: Date.now() };
   broadcastState(room);
-  scheduleAutoStart(room);
 }
-
 
 function showCards(client) {
   const room = getRoom(client);
   const player = getPlayer(client);
   if (!room || !player || room.phase !== "showdown" || !player.hand.length) return;
   player.showCards = true;
-  player.cardsDecided = true;
   room.log.unshift(`${player.name} showed their cards.`);
   broadcastState(room);
 }
-
-function muckCards(client) {
-  const room = getRoom(client);
-  const player = getPlayer(client);
-  if (!room || !player || room.phase !== "showdown" || !player.hand.length) return;
-  player.showCards = false;
-  player.cardsDecided = true;
-  room.log.unshift(`${player.name} chose not to show their cards.`);
-  broadcastState(room);
-}
-
 
 function beginTurn(room) {
   if (room.turnIndex === -1) {
@@ -771,8 +724,6 @@ function publicState(room, viewerId) {
     currentBet: room.currentBet,
     turnIndex: room.turnIndex,
     turnDeadline: room.turnDeadline,
-    autoStartDeadline: room.autoStartDeadline,
-    lastWin: room.lastWin,
     dealerIndex: room.dealerIndex,
     log: room.log.slice(0, 8),
     chipRequests: room.chipRequests,
@@ -789,16 +740,11 @@ function publicState(room, viewerId) {
       muted: player.muted,
       sittingOut: player.sittingOut,
       showingCards: player.showCards,
-      cardsDecided: Boolean(player.cardsDecided),
-      wonHand: Boolean(player.wonHand),
       isOwner: player.id === room.ownerId,
       stats: player.stats,
       dealer: index === room.dealerIndex,
       isTurn: index === room.turnIndex,
-      cards: visibleCardsFor(player, viewerId, room.phase),
-      handHint: player.id === viewerId && !player.folded && player.hand.length && room.phase !== "waiting"
-        ? handHintFor(player, room.board)
-        : null
+      cards: visibleCardsFor(player, viewerId, room.phase)
     }))
   };
 }
@@ -807,38 +753,6 @@ function visibleCardsFor(player, viewerId, phase) {
   if (player.id === viewerId) return player.hand;
   if (phase === "showdown" && player.showCards) return player.hand;
   return player.hand.map(() => null);
-}
-
-const HAND_HINT_LABELS = {
-  "high card": "High Card",
-  "one pair": "Pair",
-  "two pair": "Two Pair",
-  "three of a kind": "Three of a Kind",
-  "straight": "Straight",
-  "flush": "Flush",
-  "full house": "Full House",
-  "four of a kind": "Four of a Kind",
-  "straight flush": "Straight Flush"
-};
-
-function handHintFor(player, board) {
-  if (!player.hand || player.hand.length < 2) return null;
-  const cards = [...player.hand, ...board];
-  let key;
-  if (cards.length >= 5) {
-    key = bestHand(cards).name;
-  } else {
-    const values = cards.map((card) => rankValue(card.rank)).sort((a, b) => b - a);
-    const counts = groupCounts(values);
-    const groups = Object.entries(counts)
-      .map(([value, count]) => ({ value: Number(value), count }))
-      .sort((a, b) => b.count - a.count || b.value - a.value);
-    if (cards.length === 4 && groups[0].count === 3) key = "three of a kind";
-    else if (cards.length === 4 && groups[0].count === 2 && groups[1]?.count === 2) key = "two pair";
-    else if (groups[0].count === 2) key = "one pair";
-    else key = "high card";
-  }
-  return HAND_HINT_LABELS[key] || null;
 }
 
 function makeStats(buyIn) {
@@ -897,21 +811,6 @@ function send(client, type, payload) {
     header.writeUInt32BE(json.length, 6);
   }
   client.socket.write(Buffer.concat([header, json]));
-}
-
-function scheduleAutoStart(room) {
-  if (room.autoStartTimer) clearTimeout(room.autoStartTimer);
-  const delay = 6000;
-  room.autoStartDeadline = Date.now() + delay;
-  room.autoStartTimer = setTimeout(() => {
-    room.autoStartTimer = null;
-    room.autoStartDeadline = null;
-    if (room.paused) return;
-    const seated = room.players.filter((p) => p.seatNumber && p.stack > 0 && !p.sittingOut);
-    if (seated.length >= 2 && (room.phase === "waiting" || room.phase === "showdown")) startHand(room);
-    else broadcastState(room);
-  }, delay);
-  broadcastState(room);
 }
 
 function disconnect(client) {
