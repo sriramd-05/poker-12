@@ -677,6 +677,56 @@ function renderVoicePeers() {
   });
 }
 
+function buildIceServers() {
+  return [
+    { urls: "stun:stun.l.google.com:19302" },
+    { urls: "stun:stun1.l.google.com:19302" },
+    { urls: "stun:stun.cloudflare.com:3478" },
+    {
+      urls: [
+        "turn:openrelay.metered.ca:80",
+        "turn:openrelay.metered.ca:443",
+        "turn:openrelay.metered.ca:443?transport=tcp",
+        "turns:openrelay.metered.ca:443"
+      ],
+      username: "openrelayproject",
+      credential: "openrelayproject"
+    },
+    {
+      urls: [
+        "turn:numb.viagenie.ca:3478",
+        "turn:numb.viagenie.ca:3478?transport=tcp"
+      ],
+      username: "webrtc@live.com",
+      credential: "muazkh"
+    }
+  ];
+}
+
+// Run window.voiceDiag() in DevTools console after starting voice.
+// Shows candidate types: host=local LAN, srflx=STUN public IP, relay=TURN relay.
+// If you ONLY see host candidates, STUN/TURN are blocked by your network.
+window.voiceDiag = function() {
+  if (!peers.size) { console.log("No peers open yet — start voice first."); return; }
+  peers.forEach((peer, id) => {
+    const pc = peer.pc;
+    console.group("Peer " + id);
+    console.log("connectionState:", pc.connectionState);
+    console.log("iceConnectionState:", pc.iceConnectionState);
+    console.log("iceGatheringState:", pc.iceGatheringState);
+    pc.getStats().then((stats) => {
+      stats.forEach((r) => {
+        if (r.type === "local-candidate")
+          console.log("  local candidate:", r.candidateType, r.protocol, r.address + ":" + r.port);
+        if (r.type === "candidate-pair" && r.nominated)
+          console.log("  NOMINATED PAIR state=" + r.state, "bytesSent=" + r.bytesSent);
+      });
+    });
+    console.groupEnd();
+  });
+};
+
+
 function ensurePeer(targetId) {
   if (peers.has(targetId) || !localStream) return peers.get(targetId);
 
@@ -686,22 +736,7 @@ function ensurePeer(targetId) {
   voiceLog(`Opening peer connection to ${targetId} (${polite ? "polite" : "impolite"})`);
 
   const pc = new RTCPeerConnection({
-    iceServers: [
-      { urls: "stun:stun.l.google.com:19302" },
-      { urls: "stun:stun1.l.google.com:19302" },
-      // Open Relay free TURN — relays traffic when direct P2P fails (symmetric NAT, mobile networks).
-      // No sign-up needed. For production, replace with your own TURN server.
-      {
-        urls: [
-          "turn:openrelay.metered.ca:80",
-          "turn:openrelay.metered.ca:443",
-          "turn:openrelay.metered.ca:443?transport=tcp",
-          "turns:openrelay.metered.ca:443"
-        ],
-        username: "openrelayproject",
-        credential: "openrelayproject"
-      }
-    ]
+    iceServers: buildIceServers()
   });
 
   const peer = { pc, makingOffer: false, ignoreOffer: false, iceCandidateQueue: [] };
