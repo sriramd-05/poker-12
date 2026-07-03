@@ -689,8 +689,18 @@ function ensurePeer(targetId) {
     iceServers: [
       { urls: "stun:stun.l.google.com:19302" },
       { urls: "stun:stun1.l.google.com:19302" },
-      { urls: "stun:stun2.l.google.com:19302" },
-      { urls: "stun:stun3.l.google.com:19302" }
+      // Open Relay free TURN — relays traffic when direct P2P fails (symmetric NAT, mobile networks).
+      // No sign-up needed. For production, replace with your own TURN server.
+      {
+        urls: [
+          "turn:openrelay.metered.ca:80",
+          "turn:openrelay.metered.ca:443",
+          "turn:openrelay.metered.ca:443?transport=tcp",
+          "turns:openrelay.metered.ca:443"
+        ],
+        username: "openrelayproject",
+        credential: "openrelayproject"
+      }
     ]
   });
 
@@ -717,6 +727,8 @@ function ensurePeer(targetId) {
 
   pc.onicecandidate = ({ candidate }) => {
     if (candidate) {
+      // Log candidate type: host=local, srflx=STUN, relay=TURN
+      voiceLog(`ICE candidate [${candidate.type}] for ${targetId}`);
       send("voiceSignal", { targetId, signal: { candidate } });
     } else {
       voiceLog(`ICE gathering complete for ${targetId}`);
