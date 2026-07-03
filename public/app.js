@@ -246,13 +246,21 @@ function renderHandHint() {
 
 function renderSeats() {
   seats.innerHTML = "";
+
+  // Find local player's seat number so we can rotate positions
+  const me = state.players.find((p) => p.id === playerId);
+  const mySeatNumber = me?.seatNumber || 1;
+  // Offset so my seat maps to position index 0 (bottom-center)
+  const offset = mySeatNumber - 1;
+
   for (let seatNumber = 1; seatNumber <= state.maxPlayers; seatNumber += 1) {
     const player = state.players.find((item) => item.seatNumber === seatNumber);
     const seat = document.createElement("article");
     seat.className = player
       ? `seat ${player.isTurn ? "turn" : ""} ${player.id === playerId ? "me" : ""} ${player.sittingOut ? "away" : ""} ${player.wonHand ? "winner" : ""}`
       : "seat seat-empty";
-    const position = seatPosition(seatNumber);
+    const posIndex = (seatNumber - 1 - offset + state.maxPlayers) % state.maxPlayers;
+    const position = seatPositions[posIndex];
     seat.style.left = position[0];
     seat.style.top = position[1];
     seat.style.transform = "translate(-50%, -50%)";
@@ -282,10 +290,6 @@ function renderSeats() {
     renderCards(seat.querySelector(".seat-cards"), player.cards);
     seats.appendChild(seat);
   }
-}
-
-function seatPosition(seatNumber) {
-  return seatPositions[(seatNumber - 1) % seatPositions.length];
 }
 
 function renderBoard() {
