@@ -278,8 +278,9 @@ function renderSeats() {
     const hintBadge = player.id === playerId && player.handHint ? `<span class="badge hint">${escapeHtml(player.handHint)}</span>` : "";
     seat.innerHTML = `
       <div class="cards seat-cards"></div>
+      ${player.dealer ? '<span class="dealer dealer-outside">D</span>' : ""}
       <div class="seat-pod">
-        <div class="seat-avatar">${initials(player.name)}${player.dealer ? '<span class="dealer">D</span>' : ""}</div>
+        <div class="seat-avatar">${initials(player.name)}</div>
         <div class="seat-info">
           <span class="seat-name">${escapeHtml(player.name)}${player.isOwner ? " \u2605" : ""}</span>
           <span class="seat-stack">${player.stack}</span>
