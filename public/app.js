@@ -655,24 +655,27 @@ function renderVoicePeers() {
   state.players.filter((p) => p.id !== playerId).forEach((p) => {
     const entry = peers.get(p.id);
     const cs = entry?.pc.connectionState;
-    const label = !localStream ? "—"
-      : cs === "connected" ? "🟢 Live"
-      : cs === "connecting" || cs === "new" ? "🟡 Connecting"
-      : cs === "failed" ? "🔴 Failed"
-      : p.connected ? "⚪ Waiting"
-      : "Offline";
+    const label = !localStream
+      ? "—"
+      : cs === "connected"
+        ? "🟢 Live"
+        : cs === "connecting" || cs === "new"
+          ? "🟡 Connecting"
+          : cs === "failed"
+            ? "🔴 Failed"
+            : p.connected
+              ? "⚪ Waiting"
+              : "Offline";
+
     const row = document.createElement("div");
     row.className = "voice-peer";
     row.innerHTML = `<span>${escapeHtml(p.name)}</span><span style="font-size:0.78rem">${label}</span>`;
     voicePeers.appendChild(row);
-    // Retry any peer that failed
-    if (localStream && p.connected) {
-      if (entry?.pc.connectionState === "failed") {
-        voiceLog(`Retrying connection to ${p.name}…`);
-        peers.delete(p.id);
-        document.querySelector(`[data-audio="${p.id}"]`)?.remove();
-      }
-      ensurePeer(p.id);
+
+    if (localStream && p.connected && entry?.pc.connectionState === "failed") {
+      voiceLog(`Retrying connection to ${p.name}…`);
+      peers.delete(p.id);
+      document.querySelector(`[data-audio="${p.id}"]`)?.remove();
     }
   });
 }
@@ -814,65 +817,71 @@ function ensurePeer(targetId) {
 async function handleVoiceSignal(payload) {
   const { fromId, signal } = payload;
 
-  // If we have a local stream, ensure a peer exists.
-  // If we don't yet (other player started voice first), we can still accept
-  // the offer once our own stream is ready — but for now, just log and drop.
   if (!localStream) {
-    voiceLog(`Signal from ${fromId} received but voice not started yet — click Start Voice.`);
+    voiceLog(`Signal from ${fromId} received but voice not started yet.`);
     return;
   }
 
   const peer = ensurePeer(fromId);
   if (!peer) return;
-  const { pc } = peer;
+
+  const pc = peer.pc;
   const polite = playerId < fromId;
 
   try {
     if (signal.description) {
-      voiceLog(`Received ${signal.description.type} from ${fromId}, signalingState=${pc.signalingState}`);
+      voiceLog(
+        `DEBUG from=${fromId} polite=${polite} makingOffer=${peer.makingOffer} state=${pc.signalingState} type=${signal.description.type}`
+      );
 
       const offerCollision =
         signal.description.type === "offer" &&
         (peer.makingOffer || pc.signalingState !== "stable");
 
       peer.ignoreOffer = !polite && offerCollision;
+
       if (peer.ignoreOffer) {
         voiceLog(`Collision — impolite peer ignoring offer from ${fromId}`);
         return;
       }
 
-      // Polite peer: roll back our pending offer so we can accept theirs
       if (offerCollision) {
-        voiceLog(`Collision — polite peer rolling back offer to accept ${fromId}'s`);
+        voiceLog(`Collision — polite peer rolling back offer to accept ${fromId}`);
         await pc.setLocalDescription({ type: "rollback" });
       }
 
       await pc.setRemoteDescription(signal.description);
 
-      // Flush ICE candidates that arrived before remoteDescription was set
       for (const c of peer.iceCandidateQueue) {
-        await pc.addIceCandidate(c).catch((e) => console.warn("[Voice] Queued ICE error:", e));
+        await pc.addIceCandidate(c).catch((e) =>
+          console.warn("[Voice] Queued ICE error", e)
+        );
       }
       peer.iceCandidateQueue = [];
 
       if (signal.description.type === "offer") {
         await pc.setLocalDescription();
         voiceLog(`Sending answer to ${fromId}`);
-        send("voiceSignal", { targetId: fromId, signal: { description: pc.localDescription } });
+        send("voiceSignal", {
+          targetId: fromId,
+          signal: { description: pc.localDescription },
+        });
       }
     }
 
     if (signal.candidate) {
       if (pc.remoteDescription?.type) {
-        await pc.addIceCandidate(signal.candidate)
-          .catch((e) => { if (!peer.ignoreOffer) console.warn("[Voice] ICE candidate error:", e); });
+        await pc.addIceCandidate(signal.candidate).catch((e) => {
+          console.warn("[Voice] ICE candidate error", e);
+        });
       } else {
-        // Queue — remote description hasn't arrived yet
         peer.iceCandidateQueue.push(signal.candidate);
       }
     }
   } catch (err) {
-    if (!peer.ignoreOffer) console.error("[Voice] handleVoiceSignal error:", err);
+    if (!peer.ignoreOffer) {
+      console.error("[Voice] handleVoiceSignal error", err);
+    }
   }
 }
 
