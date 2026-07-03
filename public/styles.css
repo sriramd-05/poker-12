@@ -272,7 +272,7 @@ form {
 .table {
   position: relative;
   width: min(100%, 900px);
-  aspect-ratio: 1.75;
+  aspect-ratio: 1.35;
   margin: 0 auto;
   border: 12px solid #3a2415;
   border-radius: 32px;
@@ -687,7 +687,7 @@ form {
   @media (max-width: 960px) {
   .table-screen {
     grid-template-columns: 1fr;
-    grid-template-rows: auto minmax(300px, 52vh) auto auto;
+    grid-template-rows: auto minmax(400px, 68vh) auto auto;
   }
 
   .topbar,
@@ -710,13 +710,14 @@ form {
   }
 
   .table-wrap {
-    padding: 36px 16px;
+    padding: 20px 48px;
   }
 
   .table {
     border-width: 7px;
     border-radius: 22px;
-    aspect-ratio: 1.7;
+    aspect-ratio: 0.7;
+    width: min(100%, 380px);
   }
 
   #boardCards {
@@ -725,8 +726,8 @@ form {
   }
 
   .card {
-    width: clamp(38px, 10.5vw, 56px);
-    font-size: 0.95rem;
+    width: clamp(42px, 11vw, 58px);
+    font-size: 1rem;
   }
 
   .winner-banner {
@@ -772,11 +773,12 @@ form {
 
 @media (max-width: 420px) {
   .table-wrap {
-    padding: 30px 12px;
+    padding: 16px 40px;
   }
 
   .table {
-    aspect-ratio: 1.6;
+    aspect-ratio: 0.65;
+    width: min(100%, 340px);
   }
 
   .seat-name {
@@ -784,7 +786,7 @@ form {
   }
 
   .card {
-    width: clamp(34px, 9.5vw, 48px);
+    width: clamp(36px, 10vw, 52px);
   }
 }
 
