@@ -288,10 +288,10 @@ form {
   display: grid;
   align-content: center;
   justify-items: center;
-  gap: 8px;
+  gap: 6px;
   z-index: 2;
   padding: 0 12px;
-  margin-top: -8%;
+  margin-top: -22%;
 }
 
 .winner-banner {
@@ -329,27 +329,27 @@ form {
 .pot {
   display: inline-flex;
   justify-content: center;
-  min-width: 110px;
+  min-width: 80px;
   margin: 0 auto;
-  padding: 5px 10px;
+  padding: 3px 8px;
   border: 1px solid rgba(255, 255, 255, 0.18);
   border-radius: 999px;
   background: rgba(0, 0, 0, 0.3);
   color: white;
   font-weight: 900;
-  font-size: 0.8rem;
+  font-size: 0.62rem;
 }
 
 .round-pot {
   display: inline-flex;
   justify-content: center;
-  min-width: 90px;
-  padding: 3px 8px;
+  min-width: 70px;
+  padding: 2px 6px;
   border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: 999px;
   background: rgba(0, 0, 0, 0.18);
   color: var(--muted);
-  font-size: 0.65rem;
+  font-size: 0.52rem;
   font-weight: 800;
 }
 
