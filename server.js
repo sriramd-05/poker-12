@@ -478,10 +478,26 @@ function addLedger(room, type, player, message) {
     name: player.name,
     seatNumber: player.seatNumber,
     stack: player.stack,
+    totalBuyIn: player.stats ? player.stats.buyIns : 0,
     message,
     at: Date.now()
   });
   if (room.ledger.length > 200) room.ledger.length = 200;
+}
+
+function playerLedgerSummary(room) {
+  // Build per-player summary: name, totalBuyIn, currentStack, net
+  const map = new Map();
+  for (const player of room.players) {
+    if (!player.seatNumber && !player.stats) continue;
+    map.set(player.id, {
+      name: player.name,
+      totalBuyIn: player.stats ? player.stats.buyIns : 0,
+      currentStack: player.stack,
+      net: player.stack - (player.stats ? player.stats.buyIns : 0)
+    });
+  }
+  return [...map.values()];
 }
 
 function makeRoom() {
@@ -777,6 +793,7 @@ function publicState(room, viewerId) {
     log: room.log.slice(0, 8),
     chipRequests: room.chipRequests,
     ledger: room.ledger.slice(0, 100),
+    ledgerSummary: playerLedgerSummary(room),
     players: room.players.map((player, index) => ({
       id: player.id,
       name: player.name,

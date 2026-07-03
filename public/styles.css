@@ -266,12 +266,12 @@ form {
 
 .table-wrap {
   position: relative;
-  padding: 100px 60px;
+  padding: 70px 36px;
 }
 
 .table {
   position: relative;
-  width: min(100%, 820px);
+  width: min(100%, 900px);
   aspect-ratio: 1.35;
   margin: 0 auto;
   border: 12px solid #3a2415;
@@ -424,28 +424,12 @@ form {
   box-shadow: 0 0 0 3px rgba(224, 182, 75, 0.4), 0 6px 18px rgba(224, 182, 75, 0.28);
 }
 
-.seat-empty {
-  display: grid;
-  place-items: center;
-  gap: 2px;
-  width: 44px;
-  height: 44px;
-  border: 1px dashed rgba(255, 255, 255, 0.2);
+.seat-empty-dot {
+  width: 10px;
+  height: 10px;
   border-radius: 50%;
-  color: rgba(255, 255, 255, 0.4);
-  font-size: 0.58rem;
-  background: rgba(12, 15, 19, 0.2);
-}
-
-.seat-empty .seat-number {
-  position: static;
-  margin: 0;
-}
-
-.seat-sit {
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  font-size: 0.54rem;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
 }
 
 .seat-number {
@@ -726,7 +710,7 @@ form {
   }
 
   .table-wrap {
-    padding: 76px 44px;
+    padding: 54px 28px;
   }
 
   .table {
@@ -793,7 +777,7 @@ form {
 
 @media (max-width: 420px) {
   .table-wrap {
-    padding: 66px 34px;
+    padding: 48px 22px;
   }
 
   .table {
@@ -807,4 +791,115 @@ form {
   .card {
     width: clamp(28px, 8vw, 36px);
   }
+}
+
+/* ---- Ledger table ---- */
+.ledger-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.78rem;
+  margin-bottom: 10px;
+}
+
+.ledger-table th,
+.ledger-table td {
+  padding: 5px 6px;
+  text-align: right;
+  border-bottom: 1px solid var(--line);
+}
+
+.ledger-table th:first-child,
+.ledger-table td:first-child {
+  text-align: left;
+}
+
+.ledger-table thead th {
+  color: var(--muted);
+  font-weight: 700;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.ledger-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.net-pos {
+  color: #4cba7e;
+  font-weight: 800;
+}
+
+.net-neg {
+  color: var(--red);
+  font-weight: 800;
+}
+
+.ledger-log-title {
+  margin: 10px 0 4px;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.ledger-log {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--muted);
+  font-size: 0.75rem;
+  display: grid;
+  gap: 3px;
+  max-height: 120px;
+  overflow: auto;
+}
+
+/* ---- Chip request toast (owner alert) ---- */
+.chip-toast {
+  position: fixed;
+  bottom: -120px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 12px 16px;
+  border: 1px solid var(--gold);
+  border-radius: 12px;
+  background: #1e2129;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.5);
+  color: var(--text);
+  font-size: 0.85rem;
+  font-weight: 700;
+  min-width: 280px;
+  max-width: min(94vw, 440px);
+  transition: bottom 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.chip-toast.visible {
+  bottom: 24px;
+}
+
+.chip-toast strong {
+  color: var(--gold);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  width: 100%;
+}
+
+.chip-toast-approve {
+  min-height: 34px;
+  padding: 0 14px;
+  font-size: 0.82rem;
+}
+
+.chip-toast-approve.secondary,
+.chip-toast .secondary {
+  min-height: 34px;
+  padding: 0 12px;
+  font-size: 0.82rem;
 }

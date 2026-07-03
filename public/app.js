@@ -258,7 +258,7 @@ function renderSeats() {
     seat.style.transform = "translate(-50%, -50%)";
 
     if (!player) {
-      seat.innerHTML = `<div class="seat-number">${seatNumber}</div><span class="seat-sit">Sit</span>`;
+      seat.innerHTML = `<div class="seat-empty-dot"></div>`;
       seats.appendChild(seat);
       continue;
     }
@@ -273,7 +273,7 @@ function renderSeats() {
       <div class="seat-pod">
         <div class="seat-avatar">${initials(player.name)}${player.dealer ? '<span class="dealer">D</span>' : ""}</div>
         <div class="seat-info">
-          <span class="seat-name">${escapeHtml(player.name)}${player.isOwner ? " *" : ""}</span>
+          <span class="seat-name">${escapeHtml(player.name)}${player.isOwner ? " \u2605" : ""}</span>
           <span class="seat-stack">${player.stack}</span>
           ${winBadge || hintBadge || statusBadge || betBadge}
         </div>
@@ -357,25 +357,69 @@ function renderLog() {
   });
 }
 
+let _lastChipRequestCount = 0;
+
 function renderChipRequests() {
   const me = state.players.find((player) => player.id === playerId);
   const isOwner = state.ownerId === playerId;
   chipsForm.classList.toggle("hidden", !me || (me.stack > 0 && state.phase !== "showdown"));
   chipRequests.innerHTML = "";
-  if (!state.chipRequests?.length) {
+
+  const requests = state.chipRequests || [];
+
+  // Show toast alert to owner when new requests arrive
+  if (isOwner && requests.length > _lastChipRequestCount) {
+    const newest = requests[requests.length - 1];
+    if (newest) showChipRequestToast(newest);
+  }
+  _lastChipRequestCount = requests.length;
+
+  if (!requests.length) {
     chipRequests.innerHTML = '<p class="muted-line">No chip requests.</p>';
     return;
   }
 
-  state.chipRequests.forEach((request) => {
+  requests.forEach((request) => {
     const row = document.createElement("div");
     row.className = "chip-request";
     row.innerHTML = `
       <span>${escapeHtml(request.name)} wants ${request.amount}</span>
-      ${isOwner ? `<button data-request-id="${request.id}" data-amount="${request.amount}">Add</button>` : '<span class="muted-line">Waiting</span>'}
+      ${isOwner
+        ? `<button data-request-id="${request.id}" data-amount="${request.amount}">Approve</button>`
+        : '<span class="muted-line">Pending…</span>'}
     `;
     chipRequests.appendChild(row);
   });
+}
+
+let _chipToastTimeout = null;
+function showChipRequestToast(request) {
+  let toast = document.getElementById("chipToast");
+  if (!toast) {
+    toast = document.createElement("div");
+    toast.id = "chipToast";
+    toast.className = "chip-toast";
+    document.body.appendChild(toast);
+  }
+  toast.innerHTML = `
+    <strong>Chip Request</strong>
+    <span>${escapeHtml(request.name)} wants ${request.amount} chips</span>
+    <button data-request-id="${request.id}" data-amount="${request.amount}" class="chip-toast-approve">Approve</button>
+    <button class="chip-toast-dismiss secondary">Dismiss</button>
+  `;
+  toast.classList.add("visible");
+
+  toast.querySelector(".chip-toast-approve").addEventListener("click", () => {
+    send("approveChips", { requestId: request.id, amount: request.amount });
+    playSound("chips");
+    toast.classList.remove("visible");
+  });
+  toast.querySelector(".chip-toast-dismiss").addEventListener("click", () => {
+    toast.classList.remove("visible");
+  });
+
+  clearTimeout(_chipToastTimeout);
+  _chipToastTimeout = setTimeout(() => toast.classList.remove("visible"), 15000);
 }
 
 function renderStats() {
@@ -397,15 +441,56 @@ function renderStats() {
 
 function renderLedger() {
   ledgerPanel.innerHTML = "";
-  if (!state.ledger?.length) {
+  const summary = state.ledgerSummary;
+  if (!summary?.length) {
     ledgerPanel.innerHTML = '<p class="muted-line">No activity yet.</p>';
     return;
   }
-  state.ledger.forEach((entry) => {
-    const li = document.createElement("li");
-    li.textContent = entry.message;
-    ledgerPanel.appendChild(li);
+  // Structured player ledger table
+  const table = document.createElement("table");
+  table.className = "ledger-table";
+  table.innerHTML = `
+    <thead>
+      <tr>
+        <th>Player</th>
+        <th>Buy-in</th>
+        <th>Stack</th>
+        <th>Net</th>
+      </tr>
+    </thead>
+  `;
+  const tbody = document.createElement("tbody");
+  summary.forEach((row) => {
+    const net = row.net;
+    const netClass = net > 0 ? "net-pos" : net < 0 ? "net-neg" : "";
+    const netPrefix = net > 0 ? "+" : "";
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${escapeHtml(row.name)}</td>
+      <td>${row.totalBuyIn}</td>
+      <td>${row.currentStack}</td>
+      <td class="${netClass}">${netPrefix}${net}</td>
+    `;
+    tbody.appendChild(tr);
   });
+  table.appendChild(tbody);
+  ledgerPanel.appendChild(table);
+
+  // Recent activity log below the table
+  if (state.ledger?.length) {
+    const logTitle = document.createElement("p");
+    logTitle.className = "ledger-log-title";
+    logTitle.textContent = "Activity";
+    ledgerPanel.appendChild(logTitle);
+    const ol = document.createElement("ol");
+    ol.className = "ledger-log";
+    state.ledger.slice(0, 20).forEach((entry) => {
+      const li = document.createElement("li");
+      li.textContent = entry.message;
+      ol.appendChild(li);
+    });
+    ledgerPanel.appendChild(ol);
+  }
 }
 
 function renderRejoinBar() {
