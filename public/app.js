@@ -362,7 +362,7 @@ let _lastChipRequestCount = 0;
 function renderChipRequests() {
   const me = state.players.find((player) => player.id === playerId);
   const isOwner = state.ownerId === playerId;
-  chipsForm.classList.toggle("hidden", !me || (me.stack > 0 && state.phase !== "showdown"));
+  chipsForm.classList.toggle("hidden", !me || !me.seatNumber);
   chipRequests.innerHTML = "";
 
   const requests = state.chipRequests || [];
